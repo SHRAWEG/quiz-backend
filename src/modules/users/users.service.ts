@@ -134,9 +134,39 @@ export class UsersService {
     await this.sendVerificationEmail(savedUser);
 
     return new ApiResponse({
-      message: 'User created successfully. Please check your email for verification.',
+      message: 'User created successfully.',
       data: user,
     });
+  }
+  
+  async seedAdminUser(): Promise<void> {
+    const adminRole = await this.rolesService.findByName('Admin');
+    if (!adminRole) {
+      throw new Error('Admin role not found. Please seed roles first.');
+    }
+  
+    const existingAdmin = await this.userRepo.findOneBy({ email: 'admin@quizmaster.com' });
+    if (existingAdmin) {
+      return; // Admin user already exists
+    }
+  
+    const adminUser = this.userRepo.create({
+      firstName: 'Admin',
+      lastName: 'User',
+      email: 'admin@quizmaster.com',
+      phone: '1234567890',
+      password: await argon2.hash('admin123'), // Default password
+      isEmailVerified: true,
+      isActive: true,
+    });
+  
+    const savedAdmin = await this.userRepo.save(adminUser);
+  
+    const adminUserRole = new UserRole();
+    adminUserRole.user = savedAdmin;
+    adminUserRole.role = adminRole;
+  
+    await this.userRoleRepo.save(adminUserRole);
   }
 
   /**

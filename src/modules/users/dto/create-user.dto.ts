@@ -12,6 +12,7 @@ export class CreateUserDto {
   @IsNotEmpty()
   roleId: number;
 
+  @IsNotEmpty()
   @IsString()
   @MinLength(2)
   @Transform(({ value }) => (value as string).trim())
@@ -19,7 +20,6 @@ export class CreateUserDto {
 
   @IsString()
   @IsOptional()
-  @IsNotEmpty()
   @Transform(({ value }) => (value as string)?.trim())
   middleName?: string;
 

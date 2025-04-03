@@ -67,10 +67,16 @@ export class AuthService {
     };
     const accessToken = await this.jwtService.signAsync(payload);
 
+    // Fetch the user's role
+    const role = await this.rolesService.getUserRole(user.id);
+
     return new ApiResponse({
       message: 'User signed in successfully',
       data: {
         accessToken,
+        role: role.name,
+        email: user.email,
+        name: `${user.firstName} ${user.middleName} ${user.lastName}`,
       },
     });
   }
