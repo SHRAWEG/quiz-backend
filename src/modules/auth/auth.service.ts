@@ -6,7 +6,6 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ApiResponse } from 'src/common/classes/api-response';
 import { JwtPayload } from 'src/common/interfaces/jwt-payload.interface';
-import { RolesService } from '../roles/roles.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
@@ -17,7 +16,6 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-    private readonly rolesService: RolesService,
   ) {}
 
   /**
@@ -56,7 +54,9 @@ export class AuthService {
     // Check if user's email is verified
     // We'll skip this check for admin users in the validateUserCredentials method
     if (!user.isEmailVerified) {
-      throw new ForbiddenException('Please verify your email before logging in');
+      throw new ForbiddenException(
+        'Please verify your email before logging in',
+      );
     }
 
     await this.usersService.updateLastLogin(user.id);
@@ -68,13 +68,11 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(payload);
 
     // Fetch the user's role
-    const role = await this.rolesService.getUserRole(user.id);
 
     return new ApiResponse({
       message: 'User signed in successfully',
       data: {
         accessToken,
-        role: role.name,
         email: user.email,
         name: `${user.firstName} ${user.middleName} ${user.lastName}`,
       },

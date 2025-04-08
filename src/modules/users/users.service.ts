@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
 import { ApiResponse } from 'src/common/classes/api-response';
@@ -8,10 +12,7 @@ import {
 } from 'src/common/exceptions/validation.exception';
 import { ILike, Repository } from 'typeorm';
 import { EmailService } from '../email/email.service';
-import { Role } from '../roles/entities/role.entity';
-import { RolesService } from '../roles/roles.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UserRole } from './entities/user-role.entity';
 import { User } from './entities/user.entity';
 import { VerificationToken } from './entities/verification-token.entity';
 
@@ -19,10 +20,9 @@ import { VerificationToken } from './entities/verification-token.entity';
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
-    @InjectRepository(UserRole) private readonly userRoleRepo: Repository<UserRole>,
-    @InjectRepository(VerificationToken) private readonly verificationTokenRepo: Repository<VerificationToken>,
+    @InjectRepository(VerificationToken)
+    private readonly verificationTokenRepo: Repository<VerificationToken>,
     private readonly emailService: EmailService,
-    private rolesService: RolesService,
   ) {}
 
   // Utility method to find a user by their ID.
@@ -77,56 +77,31 @@ export class UsersService {
    * @throws {ValidationException} - If there are validation errors such as email or phone already existing, or role not found.
    */
   async createUser(dto: CreateUserDto): Promise<ApiResponse<object>> {
-    const validationErrors: ValidationError[] = [];
-
-    const role = await this.rolesService.findById(dto.roleId);
-    if (!role) {
-      validationErrors.push({
-        field: 'roleId',
-        message: 'Role not found',
-      });
-    }
+    const validationErrors: ValidationError = {};
 
     const existingUserByEmail = await this.userRepo.findOneBy({
       email: dto.email,
     });
     if (existingUserByEmail) {
-      validationErrors.push({
-        field: 'email',
-        message: 'email already exists',
-      });
+      validationErrors['email'] = ['email already exists'];
     }
-
     const existingUserByPhone = await this.userRepo.findOneBy({
       phone: dto.phone,
     });
     if (existingUserByPhone) {
-      validationErrors.push({
-        field: 'phone',
-        message: 'phone already exists',
-      });
+      validationErrors['phone'] = ['phone already exists'];
     }
-
-    // check if there are validation errors
-    if (validationErrors.length > 0) {
+    if (validationErrors) {
       throw new ValidationException(validationErrors);
     }
 
-    // create password hash
     const passwordHash = await argon2.hash(dto.password);
 
-    // create new user
     const newUser = this.userRepo.create({
       ...dto,
       password: passwordHash,
     });
     const savedUser = await this.userRepo.save(newUser);
-
-    const userRole = new UserRole();
-    userRole.user = savedUser;
-    userRole.role = role ?? new Role();
-    
-    await this.userRoleRepo.save(userRole);
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...user } = savedUser;
@@ -138,35 +113,26 @@ export class UsersService {
       data: user,
     });
   }
-  
+
   async seedAdminUser(): Promise<void> {
-    const adminRole = await this.rolesService.findByName('Admin');
-    if (!adminRole) {
-      throw new Error('Admin role not found. Please seed roles first.');
-    }
-  
-    const existingAdmin = await this.userRepo.findOneBy({ email: 'admin@quizmaster.com' });
+    const existingAdmin = await this.userRepo.findOneBy({
+      email: 'admin@quizit.com',
+    });
     if (existingAdmin) {
       return; // Admin user already exists
     }
-  
+
     const adminUser = this.userRepo.create({
       firstName: 'Admin',
       lastName: 'User',
-      email: 'admin@quizmaster.com',
+      email: 'admin@quizit.com',
       phone: '1234567890',
       password: await argon2.hash('admin123'), // Default password
       isEmailVerified: true,
       isActive: true,
     });
-  
-    const savedAdmin = await this.userRepo.save(adminUser);
-  
-    const adminUserRole = new UserRole();
-    adminUserRole.user = savedAdmin;
-    adminUserRole.role = adminRole;
-  
-    await this.userRoleRepo.save(adminUserRole);
+
+    await this.userRepo.save(adminUser);
   }
 
   /**
@@ -180,7 +146,7 @@ export class UsersService {
     const token = crypto.randomUUID();
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24); // Token expires in 24 hours
-    
+
     // Save the token
     await this.verificationTokenRepo.save({
       token,
@@ -204,25 +170,24 @@ export class UsersService {
       where: { token },
       relations: ['user'],
     });
-    
+
     if (!verificationToken) {
       throw new NotFoundException('Verification token not found');
     }
-    
+
     if (verificationToken.expiresAt < new Date()) {
       throw new UnauthorizedException('Verification token has expired');
     }
-    
+
     // Update user's email verification status
     await this.userRepo.update(
       { id: verificationToken.userId },
-      { isEmailVerified: true }
+      { isEmailVerified: true },
     );
-    
+
     // Delete the used token
     await this.verificationTokenRepo.remove(verificationToken);
   }
-
 
   /**
    * Retrieves the details of a user by their ID.

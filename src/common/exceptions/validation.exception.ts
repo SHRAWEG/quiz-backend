@@ -1,14 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 
 export interface ValidationError {
-  field: string;
-  message: string | string[];
+  [key: string]: string[];
 }
 
 export class ValidationException extends BadRequestException {
-  private validationErrors: ValidationError[];
+  private validationErrors: ValidationError;
 
-  constructor(validationErrors: ValidationError[], message?: string) {
+  constructor(validationErrors: ValidationError, message?: string) {
     super({
       message: message ?? 'Validation failed due to errors',
       errors: validationErrors,
@@ -16,7 +15,7 @@ export class ValidationException extends BadRequestException {
     this.validationErrors = validationErrors;
   }
 
-  getValidationErrors(): ValidationError[] {
+  getValidationErrors(): ValidationError {
     return this.validationErrors;
   }
 }

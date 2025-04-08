@@ -7,7 +7,8 @@ interface Response<T> {
 export class ApiResponse<T> {
   success: boolean;
   message: string;
-  data: T;
+  data?: T;
+  error?: string | object;
 
   constructor(args: Response<T>) {
     this.data = args.data;
