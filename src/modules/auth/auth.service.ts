@@ -74,6 +74,7 @@ export class AuthService {
       data: {
         accessToken,
         email: user.email,
+        role: user.role,
         name: `${user.firstName} ${user.middleName} ${user.lastName}`,
       },
     });
