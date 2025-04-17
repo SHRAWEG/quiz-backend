@@ -31,7 +31,8 @@ export class SubSubjectsService {
     };
   }
 
-  async search(search?: string, subjectId?: string) {
+  async get(page: number, limit: number, search: string, subjectId?: string) {
+    const skip = (page - 1) * limit;
     const queryBuilder = this.subSubjectRepository
       .createQueryBuilder('subSubject')
       .leftJoinAndSelect('subSubject.subject', 'subject');
@@ -45,10 +46,42 @@ export class SubSubjectsService {
         subjectId,
       });
     }
-    const subSubjects = await queryBuilder.getMany();
+    const [subSubjects, totalItems] = await queryBuilder
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    const totalPages = Math.ceil(totalItems / limit);
+
     return {
       success: true,
       message: 'Sub-subjects retrieved successfully',
+      data: subSubjects,
+      totalItems,
+      totalPages,
+      currentPage: page,
+      pageSize: limit,
+    };
+  }
+
+  async search(search: string, subjectId?: string) {
+    const queryBuilder = this.subSubjectRepository
+      .createQueryBuilder('subSubject')
+      .leftJoinAndSelect('subSubject.subject', 'subject');
+    if (search) {
+      queryBuilder.andWhere('subSubject.name ILIKE :search', {
+        search: `%${search}%`,
+      });
+    }
+    if (subjectId) {
+      queryBuilder.andWhere('subSubject.subject_id = :subjectId', {
+        subjectId,
+      });
+    }
+
+    const subSubjects = await queryBuilder.getMany();
+
+    return {
       data: subSubjects,
     };
   }

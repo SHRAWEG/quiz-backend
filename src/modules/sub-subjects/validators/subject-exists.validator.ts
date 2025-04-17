@@ -15,7 +15,7 @@ export class SubjectExistsValidator implements ValidatorConstraintInterface {
   async validate(subjectId: string): Promise<boolean> {
     if (!subjectId) return false;
 
-    const subject = await this.subjectsService.findOne(subjectId);
+    const subject = await this.subjectsService.findById(subjectId);
     return !!subject;
   }
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { Subject } from './entities/subject.entity';
@@ -12,6 +12,7 @@ export class SubjectsService {
     private readonly subjectRepository: Repository<Subject>,
   ) {}
 
+  // CREATE
   async create(createSubjectDto: CreateSubjectDto) {
     const newSubject = this.subjectRepository.create(createSubjectDto);
     const savedSubject = await this.subjectRepository.save(newSubject);
@@ -22,20 +23,60 @@ export class SubjectsService {
     };
   }
 
-  async getAll() {
-    const subjects = await this.subjectRepository.find();
+  // READ
+  async get(page: number, limit: number, search: string) {
+    const skip = (page - 1) * limit;
+    const findOptions: {
+      skip: number;
+      take: number;
+      where?: { name: any };
+    } = {
+      skip,
+      take: limit,
+    };
+    if (search) {
+      findOptions.where = {
+        name: ILike(`%${search}%`),
+      };
+    }
+    const [subjects, totalItems] =
+      await this.subjectRepository.findAndCount(findOptions);
+    const totalPages = Math.ceil(totalItems / limit);
+    return {
+      subjects,
+      totalItems,
+      totalPages,
+      currentPage: page,
+      pageSize: limit,
+    };
+  }
+
+  async search(search?: string) {
+    const findOptions: {
+      where?: { name: any };
+    } = {};
+
+    if (search) {
+      findOptions.where = {
+        name: ILike(`%${search}%`),
+      };
+    }
+
+    const subjects = await this.subjectRepository.find(findOptions);
+
     return {
       data: subjects,
     };
   }
 
-  async findOne(id: string) {
+  async findById(id: string) {
     const subject = await this.subjectRepository.findOneBy({ id: id });
     return {
       data: subject,
     };
   }
 
+  // UPDATE
   async update(id: string, updateSubjectDto: UpdateSubjectDto) {
     await this.subjectRepository.update(id, updateSubjectDto);
     const updatedSubject = await this.subjectRepository.findOneBy({ id });
@@ -47,6 +88,7 @@ export class SubjectsService {
     };
   }
 
+  // DELETE
   async delete(id: string) {
     const deletedSubject = await this.subjectRepository.delete(id);
     return {

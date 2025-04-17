@@ -4,11 +4,12 @@ import {
   Delete,
   Get,
   Param,
-  Patch,
   Post,
+  Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
 import { RolesGuard } from '../auth/guards/role.gaurd';
@@ -19,28 +20,61 @@ import { SubjectsService } from './subjects.service';
 @Controller('subjects')
 @UseGuards(RolesGuard)
 @ApiBearerAuth()
+@Roles(Role.Admin)
 export class SubjectsController {
   constructor(private readonly subjectsService: SubjectsService) {}
 
   @Post()
-  @Roles(Role.Admin)
-  // @ApiSecurity('basic')
   create(@Body() createSubjectDto: CreateSubjectDto) {
-    console.log('CONTROLLER ADATA :', createSubjectDto);
     return this.subjectsService.create(createSubjectDto);
   }
 
   @Get()
-  getAll() {
-    return this.subjectsService.getAll();
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (default: 10)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Term to search for subjects',
+  })
+  get(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search: string = '',
+  ) {
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    return this.subjectsService.get(pageNumber, limitNumber, search);
+  }
+
+  @Get('search')
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Term to search for subjects',
+  })
+  search(@Query('search') search: string = '') {
+    return this.subjectsService.search(search);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.subjectsService.findOne(id);
+    return this.subjectsService.findById(id);
   }
 
-  @Patch(':id')
+  @Put(':id')
   update(@Param('id') id: string, @Body() updateSubjectDto: UpdateSubjectDto) {
     return this.subjectsService.update(id, updateSubjectDto);
   }

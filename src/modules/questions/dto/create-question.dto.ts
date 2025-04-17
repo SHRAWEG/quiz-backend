@@ -20,7 +20,7 @@ export class CreateQuestionDto {
   question: string;
 
   @ApiProperty({
-    type: [String],
+    type: [CreateOptionDto],
     description: 'An array of four options',
     minItems: 4,
     maxItems: 4,
