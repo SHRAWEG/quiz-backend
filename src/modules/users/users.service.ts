@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
 import { ApiResponse } from 'src/common/classes/api-response';
+import { Role } from 'src/common/enums/roles.enum';
 import {
   ValidationError,
   ValidationException,
@@ -91,7 +92,7 @@ export class UsersService {
     if (existingUserByPhone) {
       validationErrors['phone'] = ['phone already exists'];
     }
-    if (validationErrors) {
+    if (validationErrors && Object.keys(validationErrors).length > 0) {
       throw new ValidationException(validationErrors);
     }
 
@@ -127,6 +128,7 @@ export class UsersService {
       lastName: 'User',
       email: 'admin@quizit.com',
       phone: '1234567890',
+      role: Role.Admin,
       password: await argon2.hash('admin123'), // Default password
       isEmailVerified: true,
       isActive: true,

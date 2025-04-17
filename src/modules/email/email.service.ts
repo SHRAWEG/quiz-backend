@@ -19,8 +19,8 @@ export class EmailService {
 
   async sendVerificationEmail(email: string, token: string): Promise<void> {
     const verificationUrl = `${this.configService.get('APP_URL')}/verify-email?token=${token}`;
-    
-    await this.transporter.sendMail({
+
+    await (this.transporter as nodemailer.Transporter).sendMail({
       from: this.configService.get('MAIL_FROM'),
       to: email,
       subject: 'Verify Your Email Address',
@@ -30,6 +30,6 @@ export class EmailService {
         <a href="${verificationUrl}">Verify Email</a>
         <p>This link will expire in 24 hours.</p>
       `,
-    });
+    } as nodemailer.SendMailOptions);
   }
 }

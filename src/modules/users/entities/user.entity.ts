@@ -1,3 +1,4 @@
+import { Role } from 'src/common/enums/roles.enum';
 import {
   Column,
   CreateDateColumn,
@@ -25,6 +26,11 @@ export class User {
 
   @Column()
   phone: string;
+  @Column({
+    type: 'enum',
+    enum: Role,
+  })
+  role: Role;
 
   @Column({ select: false })
   password: string;

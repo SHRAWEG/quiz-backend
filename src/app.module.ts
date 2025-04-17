@@ -17,6 +17,8 @@ import { User } from './modules/users/entities/user.entity';
 import { VerificationToken } from './modules/users/entities/verification-token.entity';
 import { UsersModule } from './modules/users/users.module';
 import { UsersService } from './modules/users/users.service';
+import { APP_GUARD } from '@nestjs/core';
+import { RolesGuard } from './modules/auth/guards/role.gaurd';
 
 @Module({
   imports: [
@@ -51,7 +53,14 @@ import { UsersService } from './modules/users/users.service';
     UsersModule,
   ],
   controllers: [],
-  providers: [UsersService, EmailService],
+  providers: [
+    UsersService,
+    EmailService,
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
   exports: [UsersService, EmailService],
 })
 export class AppModule implements OnModuleInit {

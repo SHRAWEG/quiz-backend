@@ -10,7 +10,7 @@ import { AuthGuard } from './guards/auth.guard';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly usersService: UsersService
+    private readonly usersService: UsersService,
   ) {}
 
   @Post('register-user')
@@ -24,8 +24,7 @@ export class AuthController {
   }
 
   @Get('verify-email')
-  async verifyEmail(token: string) 
-  {
+  async verifyEmail(token: string) {
     await this.usersService.verifyEmail(token);
     return {
       message: 'Email verified successfully',
@@ -42,13 +41,13 @@ export class AuthController {
         message: 'User not found',
       };
     }
-    
+
     if (user.isEmailVerified) {
       return {
         message: 'Email is already verified',
       };
     }
-    
+
     await this.usersService.sendVerificationEmail(user);
     return {
       message: 'Verification email sent successfully',

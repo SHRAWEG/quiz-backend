@@ -10,7 +10,7 @@ export function IdExists<E>(
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
-      options: validationOptions, // This allows custom messages
+      options: validationOptions,
       constraints: [entity],
       validator: IdExistsConstraint,
     });
