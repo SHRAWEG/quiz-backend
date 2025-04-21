@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { Subject } from './entities/subject.entity';
@@ -14,36 +14,42 @@ export class SubjectsService {
 
   // CREATE
   async create(createSubjectDto: CreateSubjectDto) {
-    const newSubject = this.subjectRepository.create(createSubjectDto);
-    const savedSubject = await this.subjectRepository.save(newSubject);
+    const queryBuilder = this.subjectRepository
+      .createQueryBuilder()
+      .insert()
+      .into(Subject)
+      .values(createSubjectDto);
+
+    const result = await queryBuilder.execute();
+
     return {
       success: true,
       message: 'Subject created successfully',
-      data: savedSubject,
+      data: result,
     };
   }
 
   // READ
   async get(page: number, limit: number, search: string) {
     const skip = (page - 1) * limit;
-    const findOptions: {
-      skip: number;
-      take: number;
-      where?: { name: any };
-    } = {
-      skip,
-      take: limit,
-    };
+    const queryBuilder = this.subjectRepository
+      .createQueryBuilder('subject')
+      .skip(skip)
+      .take(limit);
+
     if (search) {
-      findOptions.where = {
-        name: ILike(`%${search}%`),
-      };
+      queryBuilder.andWhere('subject.name ILIKE :search', {
+        search: `%${search}%`,
+      });
     }
-    const [subjects, totalItems] =
-      await this.subjectRepository.findAndCount(findOptions);
+
+    const [subjects, totalItems] = await queryBuilder.getManyAndCount();
     const totalPages = Math.ceil(totalItems / limit);
+
     return {
-      subjects,
+      success: true,
+      message: 'Subjects retrieved successfully',
+      data: subjects,
       totalItems,
       totalPages,
       currentPage: page,
@@ -52,33 +58,55 @@ export class SubjectsService {
   }
 
   async search(search?: string) {
-    const findOptions: {
-      where?: { name: any };
-    } = {};
+    const queryBuilder = this.subjectRepository.createQueryBuilder('subject');
 
     if (search) {
-      findOptions.where = {
-        name: ILike(`%${search}%`),
-      };
+      queryBuilder.andWhere('subject.name ILIKE :search', {
+        search: `%${search}%`,
+      });
     }
 
-    const subjects = await this.subjectRepository.find(findOptions);
+    const subjects = await queryBuilder.getMany();
 
     return {
+      success: true,
+      message: 'Search results retrieved successfully',
       data: subjects,
     };
   }
 
   async findById(id: string) {
-    const subject = await this.subjectRepository.findOneBy({ id: id });
+    const queryBuilder = this.subjectRepository
+      .createQueryBuilder('subject')
+      .where('subject.id = :id', { id });
+
+    const subject = await queryBuilder.getOne();
+
+    if (!subject) {
+      throw new Error('Subject not found');
+    }
+
     return {
+      success: true,
+      message: 'Subject retrieved successfully',
       data: subject,
     };
   }
 
   // UPDATE
   async update(id: string, updateSubjectDto: UpdateSubjectDto) {
-    await this.subjectRepository.update(id, updateSubjectDto);
+    const queryBuilder = this.subjectRepository
+      .createQueryBuilder()
+      .update(Subject)
+      .set(updateSubjectDto)
+      .where('id = :id', { id });
+
+    const result = await queryBuilder.execute();
+
+    if (result.affected === 0) {
+      throw new Error('Subject not found');
+    }
+
     const updatedSubject = await this.subjectRepository.findOneBy({ id });
 
     return {
@@ -90,11 +118,21 @@ export class SubjectsService {
 
   // DELETE
   async delete(id: string) {
-    const deletedSubject = await this.subjectRepository.delete(id);
+    const queryBuilder = this.subjectRepository
+      .createQueryBuilder()
+      .delete()
+      .where('id = :id', { id });
+
+    const result = await queryBuilder.execute();
+
+    if (result.affected === 0) {
+      throw new Error('Subject not found');
+    }
+
     return {
       success: true,
       message: 'Subject deleted successfully',
-      data: deletedSubject,
+      data: result,
     };
   }
 }

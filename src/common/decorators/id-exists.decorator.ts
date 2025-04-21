@@ -9,7 +9,7 @@ export function IdExists<E>(
   return function (object: Record<string, any>, propertyName: string) {
     registerDecorator({
       target: object.constructor,
-      propertyName: propertyName,
+      propertyName,
       options: validationOptions,
       constraints: [entity],
       validator: IdExistsConstraint,

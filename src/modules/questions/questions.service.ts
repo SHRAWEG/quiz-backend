@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ApiResponse } from 'src/common/classes/api-response';
 import { Repository } from 'typeorm';
@@ -6,7 +6,7 @@ import { Option } from '../options/entities/option.entity';
 import { SubSubjectsService } from '../sub-subjects/sub-subjects.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
-import { Question } from './entities/question.entity';
+import { Question, QuestionStatus } from './entities/question.entity';
 
 @Injectable()
 export class QuestionsService {
@@ -15,23 +15,21 @@ export class QuestionsService {
     private readonly questionsRepository: Repository<Question>,
     @InjectRepository(Option)
     private readonly optionsRepository: Repository<Option>,
-    // @Inject(forwardRef(() => SubSubjectsService)) // <-- wrap QuestionsService injection
     private readonly subSubjectService: SubSubjectsService,
   ) {}
 
-  // CREATE
   async create(
     dto: CreateQuestionDto,
     id: string,
   ): Promise<ApiResponse<object>> {
-    const { options: options, ...questionData } = dto;
+    const { options, ...questionData } = dto;
 
-    const optionsToCreate = options.map((opt) => {
-      return this.optionsRepository.create({
+    const optionsToCreate = options.map((opt) =>
+      this.optionsRepository.create({
         option: opt.option,
         isCorrect: opt.isCorrect,
-      });
-    });
+      }),
+    );
 
     const subSubject = await this.subSubjectService.getById(
       questionData.subSubjectId,
@@ -48,12 +46,11 @@ export class QuestionsService {
 
     return {
       success: true,
-      message: 'Question and options created successfully',
+      message: 'Question created successfully',
       data: savedQuestion,
     };
   }
 
-  // READ
   async get(
     page: number,
     limit: number,
@@ -78,19 +75,19 @@ export class QuestionsService {
         search: `%${search}%`,
       });
     }
-
     if (subjectId) {
       query.andWhere('question.subjectId = :subjectId', { subjectId });
     }
-
     if (subSubjectId) {
       query.andWhere('question.subSubjectId = :subSubjectId', { subSubjectId });
     }
 
-    const [questions, totalItems] = await query.getManyAndCount();
+    const [data, totalItems] = await query.getManyAndCount();
 
     return {
-      questions,
+      success: true,
+      message: 'Questions retrieved successfully',
+      data,
       totalItems,
       totalPages: Math.ceil(totalItems / limit),
       currentPage: page,
@@ -101,33 +98,32 @@ export class QuestionsService {
   async search(search: string, subjectId: string, subSubjectId: string) {
     const query = this.questionsRepository
       .createQueryBuilder('question')
+      .leftJoinAndSelect('question.subSubject', 'subSubject')
       .leftJoinAndSelect('question.options', 'options');
 
     if (search) {
-      query.andWhere('subSubject.name ILIKE :search', {
+      query.andWhere('question.question ILIKE :search', {
         search: `%${search}%`,
       });
     }
     if (subjectId) {
-      query.andWhere('subSubject.subject_id = :subjectId', {
-        subjectId,
-      });
+      query.andWhere('question.subjectId = :subjectId', { subjectId });
     }
     if (subSubjectId) {
-      query.andWhere('subSubject.sub_subject_id = :subSubjectId', {
-        subjectId,
-      });
+      query.andWhere('question.subSubjectId = :subSubjectId', { subSubjectId });
     }
 
     const questions = await query.getMany();
 
     return {
+      success: true,
+      message: 'Questions search result',
       data: questions,
     };
   }
 
   async getById(id: string) {
-    const query = this.questionsRepository
+    const question = await this.questionsRepository
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.subject', 'subject')
       .leftJoinAndSelect('question.subSubject', 'subSubject')
@@ -137,41 +133,35 @@ export class QuestionsService {
       .where('question.id = :id', { id })
       .getOne();
 
-    const questions = await query;
     return {
       success: true,
-      message: 'Questions retrieved successfully',
-      data: questions,
+      message: 'Question retrieved successfully',
+      data: question,
     };
   }
 
-  // UPDATE
   async update(id: string, updateDto: UpdateQuestionDto) {
-    const { options, ...questionData } = updateDto; // Extract options from the DTO
+    const { options, ...questionData } = updateDto;
 
-    // Step 1: Delete all old options for the question using QueryBuilder
     await this.optionsRepository
       .createQueryBuilder()
       .delete()
       .where('question_id = :id', { id })
       .execute();
 
-    // Step 2: Update the question data using QueryBuilder
     await this.questionsRepository
       .createQueryBuilder()
       .update()
-      .set(questionData) // Update the fields except 'options'
+      .set(questionData)
       .where('id = :id', { id })
       .execute();
 
-    // Step 3: Add new options if they exist
     if (options && options.length > 0) {
       const newOptions = options.map((option) => ({
         ...option,
-        question: { id }, // Associate the options with the question
+        question: { id },
       }));
 
-      // Insert new options into the 'options' table
       await this.optionsRepository
         .createQueryBuilder()
         .insert()
@@ -180,37 +170,78 @@ export class QuestionsService {
         .execute();
     }
 
-    // Step 4: Return the updated question data
-    const updatedQuestion = await this.questionsRepository.findOne({
-      where: { id },
-      relations: [
-        'subject',
-        'subSubject',
-        'createdBy',
-        'processedBy',
-        'options',
-      ],
-    });
+    const updatedQuestion = await this.questionsRepository
+      .createQueryBuilder('question')
+      .leftJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.subSubject', 'subSubject')
+      .leftJoinAndSelect('question.createdBy', 'createdBy')
+      .leftJoinAndSelect('question.processedBy', 'processedBy')
+      .leftJoinAndSelect('question.options', 'options')
+      .where('question.id = :id', { id })
+      .getOne();
 
     return {
       success: true,
-      message: 'Question and options updated successfully',
+      message: 'Question updated successfully',
       data: updatedQuestion,
     };
   }
 
-  //DELETE
-  async delete(id: string) {
-    const query = this.questionsRepository
+  async approveQuestion(id: string, processedById: string) {
+    const result = await this.questionsRepository
       .createQueryBuilder()
-      .delete()
-      .where('id = :id', { id });
+      .update()
+      .set({
+        status: QuestionStatus.APPROVED,
+        processedById,
+      })
+      .where('id = :id', { id })
+      .execute();
 
-    const deletedQuestion = await query.execute();
+    if (result.affected === 0) {
+      throw new NotFoundException(`Question with ID ${id} not found`);
+    }
+
     return {
       success: true,
-      message: 'Sub Subject deleted successfully',
-      data: deletedQuestion,
+      message: 'Question approved successfully',
+      data: { affected: result.affected },
+    };
+  }
+
+  async rejectQuestion(id: string, processedById: string) {
+    const result = await this.questionsRepository
+      .createQueryBuilder()
+      .update()
+      .set({
+        status: QuestionStatus.REJECTED,
+        processedById,
+      })
+      .where('id = :id', { id })
+      .execute();
+
+    if (result.affected === 0) {
+      throw new NotFoundException(`Question with ID ${id} not found`);
+    }
+
+    return {
+      success: true,
+      message: 'Question rejected successfully',
+      data: { affected: result.affected },
+    };
+  }
+
+  async delete(id: string) {
+    const result = await this.questionsRepository
+      .createQueryBuilder()
+      .delete()
+      .where('id = :id', { id })
+      .execute();
+
+    return {
+      success: true,
+      message: 'Question deleted successfully',
+      data: { affected: result.affected },
     };
   }
 }

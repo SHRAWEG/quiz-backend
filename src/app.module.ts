@@ -1,24 +1,29 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DatabaseModule } from './database/database.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { EmailService } from './modules/email/email.service';
+// ENTITIES
 import { Option } from './modules/options/entities/option.entity';
-import { OptionsModule } from './modules/options/options.module';
 import { Question } from './modules/questions/entities/question.entity';
-import { QuestionsModule } from './modules/questions/questions.module';
 import { SubSubject } from './modules/sub-subjects/entities/sub-subject.entity';
-import { SubSubjectsModule } from './modules/sub-subjects/sub-subjects.module';
 import { Subject } from './modules/subjects/entities/subject.entity';
-import { SubjectsModule } from './modules/subjects/subjects.module';
 import { User } from './modules/users/entities/user.entity';
 import { VerificationToken } from './modules/users/entities/verification-token.entity';
-import { UsersModule } from './modules/users/users.module';
-import { UsersService } from './modules/users/users.service';
-import { APP_GUARD } from '@nestjs/core';
+// GUARDS
 import { RolesGuard } from './modules/auth/guards/role.gaurd';
+// SERVICES
+import { EmailService } from './modules/email/email.service';
+import { UsersService } from './modules/users/users.service';
+// MODULES
+import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { OptionsModule } from './modules/options/options.module';
+import { QuestionSetsModule } from './modules/question-sets/question-sets.module';
+import { QuestionsModule } from './modules/questions/questions.module';
+import { SubSubjectsModule } from './modules/sub-subjects/sub-subjects.module';
+import { SubjectsModule } from './modules/subjects/subjects.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -51,6 +56,7 @@ import { RolesGuard } from './modules/auth/guards/role.gaurd';
     SubjectsModule,
     SubSubjectsModule,
     UsersModule,
+    QuestionSetsModule,
   ],
   controllers: [],
   providers: [

@@ -4,7 +4,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
-import { EntityManager, EntityTarget } from 'typeorm';
+import { EntityManager, EntityTarget, In } from 'typeorm';
 
 @Injectable()
 @ValidatorConstraint({ name: 'idExists', async: true })
@@ -19,15 +19,24 @@ export class IdExistsConstraint implements ValidatorConstraintInterface {
       );
     }
 
-    if (typeof value === 'undefined' || value === null) {
-      return true; // Allow optional foreign keys to be null
+    if (value === null || typeof value === 'undefined') {
+      return true; // Allow optional values
     }
 
     try {
-      const entityExists = await this.entityManager.findOne(entityTarget, {
-        where: { id: value },
-      });
-      return !!entityExists;
+      if (Array.isArray(value)) {
+        if (value.length === 0) return true;
+
+        const found = await this.entityManager.findBy(entityTarget, {
+          id: In(value),
+        });
+        return found.length === value.length;
+      } else {
+        const entityExists = await this.entityManager.findOne(entityTarget, {
+          where: { id: value },
+        });
+        return !!entityExists;
+      }
     } catch (error) {
       const entityName =
         typeof entityTarget === 'function' ? entityTarget.name : 'Entity';
@@ -38,11 +47,12 @@ export class IdExistsConstraint implements ValidatorConstraintInterface {
       return false;
     }
   }
+
   defaultMessage(args?: ValidationArguments): string {
     const entityTarget = args?.constraints?.[0] as EntityTarget<unknown>;
     const property = args?.property;
     const entityName =
       typeof entityTarget === 'function' ? entityTarget.name : 'Entity';
-    return `${property} must be a valid ID in the ${entityName} table.`;
+    return `${property} must contain valid ID(s) from the ${entityName} table.`;
   }
 }

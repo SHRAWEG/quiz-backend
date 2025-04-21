@@ -1,4 +1,5 @@
 import { Option } from 'src/modules/options/entities/option.entity';
+import { QuestionSet } from 'src/modules/question-sets/entities/question-set.entity';
 import { SubSubject } from 'src/modules/sub-subjects/entities/sub-subject.entity';
 import { Subject } from 'src/modules/subjects/entities/subject.entity';
 import { User } from 'src/modules/users/entities/user.entity';
@@ -6,6 +7,7 @@ import {
   Column,
   Entity,
   JoinColumn,
+  ManyToMany,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -28,6 +30,13 @@ export enum DifficultyLevel {
   LEVEL5 = 5,
 }
 
+export enum QuestionStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  DRAFT = 'draft',
+}
+
 @Entity('questions')
 export class Question {
   @PrimaryGeneratedColumn('uuid')
@@ -47,6 +56,13 @@ export class Question {
 
   @Column({ type: 'text' })
   subSubjectId: string;
+
+  @Column({
+    type: 'enum',
+    enum: QuestionStatus,
+    default: QuestionStatus.PENDING,
+  })
+  status: string;
 
   @Column({ type: 'text' })
   createdById: string;
@@ -93,4 +109,7 @@ export class Question {
   })
   @JoinColumn({ name: 'sub_subject_id' })
   subSubject: Relation<SubSubject>;
+
+  @ManyToMany(() => QuestionSet, (questionSet) => questionSet.questions)
+  questionSets: QuestionSet[];
 }

@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -11,10 +12,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Roles } from 'src/common/decorators/role.decorator';
+import { Role } from 'src/common/enums/roles.enum';
 import { AuthRolesGuard } from '../auth/guards/auth-role.gaurd';
+import { User } from '../users/entities/user.entity';
 import { CreateQuestionDto } from './dto/create-question.dto';
-import { QuestionsService } from './questions.service';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { QuestionsService } from './questions.service';
 
 @Controller('questions')
 export class QuestionsController {
@@ -107,6 +111,22 @@ export class QuestionsController {
     @Body() updateQuestionDto: UpdateQuestionDto,
   ) {
     return this.questionService.update(id, updateQuestionDto);
+  }
+
+  @Patch('approve/:id')
+  @UseGuards(AuthRolesGuard)
+  @ApiBearerAuth()
+  updateStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
+    const processedbyId = req.user.id;
+    return this.questionService.approveQuestion(id, processedbyId);
+  }
+
+  @Patch('approrejectve/:id')
+  @ApiBearerAuth()
+  @Roles(Role.Admin)
+  rejectStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
+    const processedbyId = req.user.id;
+    return this.questionService.rejectQuestion(id, processedbyId);
   }
 
   @Delete(':id')

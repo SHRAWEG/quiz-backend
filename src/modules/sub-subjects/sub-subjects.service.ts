@@ -22,12 +22,17 @@ export class SubSubjectsService {
   ) {}
 
   async create(createSubSubjectDto: CreateSubSubjectDto) {
-    const newSubSubject = this.subSubjectRepository.create(createSubSubjectDto);
-    const savedsubSubject = await this.subSubjectRepository.save(newSubSubject);
+    const queryBuilder = this.subSubjectRepository
+      .createQueryBuilder('subSubject')
+      .insert()
+      .values(createSubSubjectDto);
+
+    const result = await queryBuilder.execute();
+
     return {
       success: true,
       message: 'Sub-Subject created successfully',
-      data: savedsubSubject,
+      data: result,
     };
   }
 
@@ -36,16 +41,19 @@ export class SubSubjectsService {
     const queryBuilder = this.subSubjectRepository
       .createQueryBuilder('subSubject')
       .leftJoinAndSelect('subSubject.subject', 'subject');
+
     if (search) {
       queryBuilder.andWhere('subSubject.name ILIKE :search', {
         search: `%${search}%`,
       });
     }
+
     if (subjectId) {
       queryBuilder.andWhere('subSubject.subject_id = :subjectId', {
         subjectId,
       });
     }
+
     const [subSubjects, totalItems] = await queryBuilder
       .skip(skip)
       .take(limit)
@@ -68,11 +76,13 @@ export class SubSubjectsService {
     const queryBuilder = this.subSubjectRepository
       .createQueryBuilder('subSubject')
       .leftJoinAndSelect('subSubject.subject', 'subject');
+
     if (search) {
       queryBuilder.andWhere('subSubject.name ILIKE :search', {
         search: `%${search}%`,
       });
     }
+
     if (subjectId) {
       queryBuilder.andWhere('subSubject.subject_id = :subjectId', {
         subjectId,
@@ -82,39 +92,57 @@ export class SubSubjectsService {
     const subSubjects = await queryBuilder.getMany();
 
     return {
+      success: true,
+      message: 'Search results retrieved successfully',
       data: subSubjects,
     };
   }
 
   async getById(id: string) {
-    const subsubject = await this.subSubjectRepository.findOne({
-      where: { id },
-      relations: {
-        subject: true,
-      },
-    });
+    const queryBuilder = this.subSubjectRepository
+      .createQueryBuilder('subSubject')
+      .leftJoinAndSelect('subSubject.subject', 'subject')
+      .where('subSubject.id = :id', { id });
+
+    const subSubject = await queryBuilder.getOne();
+
+    if (!subSubject) {
+      throw new HttpException('Sub-Subject not found', HttpStatus.NOT_FOUND);
+    }
+
     return {
-      data: subsubject,
+      success: true,
+      message: 'Sub-Subject retrieved successfully',
+      data: subSubject,
     };
   }
 
   async update(id: string, updateSubSubjectDto: UpdateSubSubjectDto) {
-    await this.subSubjectRepository.update(id, updateSubSubjectDto);
+    const queryBuilder = this.subSubjectRepository
+      .createQueryBuilder()
+      .update(SubSubject)
+      .set(updateSubSubjectDto)
+      .where('id = :id', { id });
+
+    const result = await queryBuilder.execute();
+
+    if (result.affected === 0) {
+      throw new HttpException('Sub-Subject not found', HttpStatus.NOT_FOUND);
+    }
+
     return {
       success: true,
-      message: 'Sub Subject updated successfully',
-      data: {
-        id: id,
-        ...updateSubSubjectDto,
-      },
+      message: 'Sub-Subject updated successfully',
+      data: { id, ...updateSubSubjectDto },
     };
   }
 
   async delete(id: string) {
-    const subSubject = await this.subSubjectRepository.findOne({
-      where: { id },
-      relations: ['questions'],
-    });
+    const subSubject = await this.subSubjectRepository
+      .createQueryBuilder('subSubject')
+      .leftJoinAndSelect('subSubject.questions', 'questions')
+      .where('subSubject.id = :id', { id })
+      .getOne();
 
     if (subSubject && subSubject.questions.length > 0) {
       throw new HttpException(
@@ -122,11 +150,17 @@ export class SubSubjectsService {
         HttpStatus.BAD_REQUEST, // This is equivalent to HTTP status code 400
       );
     }
-    const deletedSubSubject = await this.subSubjectRepository.delete(id);
+
+    const result = await this.subSubjectRepository
+      .createQueryBuilder()
+      .delete()
+      .where('id = :id', { id })
+      .execute();
+
     return {
       success: true,
-      message: 'Sub Subject deleted successfully',
-      data: deletedSubSubject,
+      message: 'Sub-Subject deleted successfully',
+      data: result,
     };
   }
 }
