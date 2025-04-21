@@ -14,18 +14,20 @@ import {
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
-import { AuthRolesGuard } from '../auth/guards/auth-role.gaurd';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { RolesGuard } from '../auth/guards/role.gaurd';
 import { User } from '../users/entities/user.entity';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { QuestionsService } from './questions.service';
 
 @Controller('questions')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles(Role.Admin)
+@ApiBearerAuth()
 export class QuestionsController {
   constructor(private readonly questionService: QuestionsService) {}
   @Post()
-  @UseGuards(AuthRolesGuard)
-  @ApiBearerAuth()
   async addQuestion(
     @Body() createQuestionDto: CreateQuestionDto,
     @Req() req: Request & { user: { id: string; email: string } },
@@ -37,6 +39,7 @@ export class QuestionsController {
   }
 
   @Get()
+  @Roles(Role.Admin, Role.Teacher)
   @ApiQuery({
     name: 'page',
     required: false,
@@ -101,11 +104,13 @@ export class QuestionsController {
   }
 
   @Get(':id')
+  @Roles(Role.Admin, Role.Teacher)
   findOne(@Param('id') id: string) {
     return this.questionService.getById(id);
   }
 
   @Put(':id')
+  @Roles(Role.Admin, Role.Teacher)
   update(
     @Param('id') id: string,
     @Body() updateQuestionDto: UpdateQuestionDto,
@@ -114,7 +119,6 @@ export class QuestionsController {
   }
 
   @Patch('approve/:id')
-  @UseGuards(AuthRolesGuard)
   @ApiBearerAuth()
   updateStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
     const processedbyId = req.user.id;
@@ -123,13 +127,13 @@ export class QuestionsController {
 
   @Patch('approrejectve/:id')
   @ApiBearerAuth()
-  @Roles(Role.Admin)
   rejectStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
     const processedbyId = req.user.id;
     return this.questionService.rejectQuestion(id, processedbyId);
   }
 
   @Delete(':id')
+  @Roles(Role.Admin, Role.Teacher)
   delete(@Param('id') id: string) {
     return this.questionService.delete(id);
   }

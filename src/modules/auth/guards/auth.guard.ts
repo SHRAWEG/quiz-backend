@@ -20,6 +20,8 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    console.log('AuthGuard executing...');
+    console.log('AuthGuard executing...');
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       // Check for @Public() decorator
       context.getHandler(),
@@ -32,6 +34,7 @@ export class AuthGuard implements CanActivate {
 
     const request: Request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
+    console.log('AuthGuard executing... : ', token);
 
     if (!token) {
       throw new UnauthorizedException('Access token missing in the request');
@@ -39,11 +42,12 @@ export class AuthGuard implements CanActivate {
 
     try {
       const payload: JwtPayload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.getOrThrow('app.auth.jwtSecret'),
+        secret: this.configService.getOrThrow('JWT_SECRET'),
       });
-
+      console.log('PAYLOAD', payload);
       request.user = payload;
-    } catch {
+    } catch (error) {
+      console.error('JWT Verification Error:', error);
       throw new UnauthorizedException('Invalid access token supplied');
     }
 

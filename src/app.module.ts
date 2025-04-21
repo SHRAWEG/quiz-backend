@@ -1,6 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 // ENTITIES
@@ -11,7 +10,6 @@ import { Subject } from './modules/subjects/entities/subject.entity';
 import { User } from './modules/users/entities/user.entity';
 import { VerificationToken } from './modules/users/entities/verification-token.entity';
 // GUARDS
-import { RolesGuard } from './modules/auth/guards/role.gaurd';
 // SERVICES
 import { EmailService } from './modules/email/email.service';
 import { UsersService } from './modules/users/users.service';
@@ -59,14 +57,7 @@ import { UsersModule } from './modules/users/users.module';
     QuestionSetsModule,
   ],
   controllers: [],
-  providers: [
-    UsersService,
-    EmailService,
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
-  ],
+  providers: [UsersService, EmailService],
   exports: [UsersService, EmailService],
 })
 export class AppModule implements OnModuleInit {

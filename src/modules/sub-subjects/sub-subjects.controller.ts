@@ -71,6 +71,7 @@ export class SubSubjectsController {
   }
 
   @Get('search')
+  @Roles(Role.Admin, Role.Teacher)
   @ApiQuery({
     name: 'search',
     required: false,
@@ -83,7 +84,6 @@ export class SubSubjectsController {
     type: String,
     description: 'Subject Id to filter sub-subjects',
   })
-  @Roles(Role.Admin, Role.Teacher)
   search(
     @Query('search') search: string = '',
     @Query('subjectId') subjectId: string = '',

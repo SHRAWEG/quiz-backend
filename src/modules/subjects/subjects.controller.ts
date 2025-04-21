@@ -59,13 +59,13 @@ export class SubjectsController {
   }
 
   @Get('search')
+  @Roles(Role.Admin, Role.Teacher)
   @ApiQuery({
     name: 'search',
     required: false,
     type: String,
     description: 'Term to search for subjects',
   })
-  @Roles(Role.Admin, Role.Teacher)
   search(@Query('search') search: string = '') {
     return this.subjectsService.search(search);
   }
