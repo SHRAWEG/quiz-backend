@@ -7,10 +7,11 @@ import {
 import { EntityManager } from 'typeorm';
 import { IsUniqeInterface } from '../decorators/is-unique.decorator';
 
-@ValidatorConstraint({ name: 'Exists', async: true })
+@ValidatorConstraint({ name: 'IsUnique', async: true })
 @Injectable()
 export class IsUniqueConstraint implements ValidatorConstraintInterface {
   constructor(private readonly entityManager: EntityManager) {}
+
   async validate(
     value: string | number,
     args?: ValidationArguments,
@@ -21,18 +22,21 @@ export class IsUniqueConstraint implements ValidatorConstraintInterface {
     const { tableName, column }: IsUniqeInterface = args
       .constraints[0] as IsUniqeInterface;
 
-    // database query check data is exists
-    const dataExist = await this.entityManager
+    if (!tableName || !column) {
+      throw new Error('tableName and column must be provided');
+    }
+
+    // database query check if data exists
+    const count = await this.entityManager
       .getRepository(tableName)
       .createQueryBuilder(tableName)
       .where({ [column]: value })
-      .getExists();
+      .getCount();
 
-    return !dataExist;
+    return count === 0; // If count is 0, the value is unique
   }
   defaultMessage(validationArguments?: ValidationArguments): string {
-    // return custom field message
     const field: string = validationArguments?.property || 'Field';
-    return `${field} is already exist`;
+    return `${field} is already taken`;
   }
 }

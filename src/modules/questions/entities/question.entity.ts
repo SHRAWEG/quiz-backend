@@ -1,6 +1,7 @@
 import { Option } from 'src/modules/options/entities/option.entity';
 import { SubSubject } from 'src/modules/sub-subjects/entities/sub-subject.entity';
 import { Subject } from 'src/modules/subjects/entities/subject.entity';
+import { User } from 'src/modules/users/entities/user.entity';
 import {
   Column,
   Entity,
@@ -20,11 +21,11 @@ export enum QuestionType {
 }
 
 export enum DifficultyLevel {
-  LEVEL1 = 'level1',
-  LEVEL2 = 'level2',
-  LEVEL3 = 'level3',
-  LEVEL4 = 'level4',
-  LEVEL5 = 'level5',
+  LEVEL1 = 1,
+  LEVEL2 = 2,
+  LEVEL3 = 3,
+  LEVEL4 = 4,
+  LEVEL5 = 5,
 }
 
 @Entity('questions')
@@ -47,6 +48,12 @@ export class Question {
   @Column({ type: 'text' })
   subSubjectId: string;
 
+  @Column({ type: 'text' })
+  createdById: string;
+
+  @Column({ type: 'text' })
+  processedById: string;
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
@@ -67,6 +74,18 @@ export class Question {
   })
   @JoinColumn({ name: 'subject_id' })
   subject: Relation<Subject>;
+
+  @ManyToOne(() => User, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'created_by_id' })
+  createdBy: Relation<User>;
+
+  @ManyToOne(() => User, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'processed_by_id' })
+  procesedBy: Relation<User>;
 
   @ManyToOne(() => SubSubject, {
     cascade: ['insert', 'update', 'remove'],

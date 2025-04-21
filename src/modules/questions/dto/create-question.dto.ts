@@ -12,6 +12,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import { IsUnique } from 'src/common/decorators/is-unique.decorator';
 import { OnlyOneCorrectOption } from 'src/common/validators/only-one-correct-option.validator';
 import { UniqueOptionsText } from 'src/common/validators/unique-opyions-text.valitaros';
 import { CreateOptionDto } from 'src/modules/options/dto/create-option.dto';
@@ -22,6 +23,9 @@ export class CreateQuestionDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
+  @IsUnique('questions', 'question', {
+    message: 'This question already exists',
+  })
   question: string;
 
   @ApiProperty({

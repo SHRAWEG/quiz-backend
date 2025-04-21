@@ -10,12 +10,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { CreateSubSubjectDto } from './dto/create-sub-subject.dto';
-import { UpdateSubSubjectDto } from './dto/update-sub-subject.dto';
-import { SubSubjectsService } from './sub-subjects.service';
 import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
 import { RolesGuard } from '../auth/guards/role.gaurd';
+import { CreateSubSubjectDto } from './dto/create-sub-subject.dto';
+import { UpdateSubSubjectDto } from './dto/update-sub-subject.dto';
+import { SubSubjectsService } from './sub-subjects.service';
 
 @Controller('sub-subjects')
 @UseGuards(RolesGuard)
@@ -83,6 +83,7 @@ export class SubSubjectsController {
     type: String,
     description: 'Subject Id to filter sub-subjects',
   })
+  @Roles(Role.Admin, Role.Teacher)
   search(
     @Query('search') search: string = '',
     @Query('subjectId') subjectId: string = '',

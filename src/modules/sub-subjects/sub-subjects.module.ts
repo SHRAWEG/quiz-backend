@@ -17,6 +17,6 @@ import { SubSubjectsService } from './sub-subjects.service';
   ],
   controllers: [SubSubjectsController],
   providers: [SubSubjectsService, IdExistsConstraint, QuestionsService],
-  exports: [SubSubjectsService],
+  exports: [SubSubjectsService, SubSubjectsModule],
 })
 export class SubSubjectsModule {}

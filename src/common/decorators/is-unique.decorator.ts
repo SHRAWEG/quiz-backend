@@ -1,24 +1,23 @@
-import { ValidationOptions, registerDecorator } from 'class-validator';
+import { registerDecorator, ValidationOptions } from 'class-validator';
 import { IsUniqueConstraint } from '../validators/is-unique.validator';
 
-// decorator options interface
-export type IsUniqeInterface = {
+export interface IsUniqeInterface {
   tableName: string;
   column: string;
-};
+}
 
-// decorator function
 export function IsUnique(
-  options: IsUniqeInterface,
+  tableName: string,
+  column: string,
   validationOptions?: ValidationOptions,
 ) {
-  return function (object: Record<string, unknown>, propertyName: string) {
+  return (object: Record<string, any>, propertyName: string) => {
     registerDecorator({
       name: 'IsUnique',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
-      constraints: [options],
+      constraints: [{ tableName, column }],
       validator: IsUniqueConstraint,
     });
   };
