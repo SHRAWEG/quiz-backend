@@ -19,7 +19,10 @@ import { CreateOptionDto } from 'src/modules/options/dto/create-option.dto';
 import { DifficultyLevel, QuestionType } from '../entities/question.entity';
 
 export class CreateQuestionDto {
-  @ApiProperty({ description: 'The question text', example: 'What is 2 + 2?' })
+  @ApiProperty({
+    description: 'The question text',
+    example: 'What color is an apple?',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)

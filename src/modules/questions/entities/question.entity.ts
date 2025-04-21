@@ -51,8 +51,8 @@ export class Question {
   @Column({ type: 'text' })
   createdById: string;
 
-  @Column({ type: 'text' })
-  processedById: string;
+  @Column({ type: 'text', nullable: true })
+  processedById?: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
@@ -83,9 +83,10 @@ export class Question {
 
   @ManyToOne(() => User, {
     onDelete: 'CASCADE',
+    nullable: true,
   })
   @JoinColumn({ name: 'processed_by_id' })
-  procesedBy: Relation<User>;
+  processedBy?: Relation<User>;
 
   @ManyToOne(() => SubSubject, {
     cascade: ['insert', 'update', 'remove'],

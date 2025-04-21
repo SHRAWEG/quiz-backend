@@ -27,9 +27,6 @@ export class IdExistsConstraint implements ValidatorConstraintInterface {
       const entityExists = await this.entityManager.findOne(entityTarget, {
         where: { id: value },
       });
-      console.log('entityExists:', entityExists);
-      console.log('entityExists:', entityExists);
-      console.log('entityExists:', entityExists);
       return !!entityExists;
     } catch (error) {
       const entityName =
