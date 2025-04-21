@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { Option } from '../options/entities/option.entity';
 import { SubSubjectsService } from '../sub-subjects/sub-subjects.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
+import { UpdateQuestionDto } from './dto/update-question.dto';
 import { Question } from './entities/question.entity';
 
 @Injectable()
@@ -13,7 +14,7 @@ export class QuestionsService {
     @InjectRepository(Question)
     private readonly questionsRepository: Repository<Question>,
     @InjectRepository(Option)
-    private readonly optionsRepoitory: Repository<Option>,
+    private readonly optionsRepository: Repository<Option>,
     // @Inject(forwardRef(() => SubSubjectsService)) // <-- wrap QuestionsService injection
     private readonly subSubjectService: SubSubjectsService,
   ) {}
@@ -26,7 +27,7 @@ export class QuestionsService {
     const { options: options, ...questionData } = dto;
 
     const optionsToCreate = options.map((opt) => {
-      return this.optionsRepoitory.create({
+      return this.optionsRepository.create({
         option: opt.option,
         isCorrect: opt.isCorrect,
       });
@@ -144,24 +145,61 @@ export class QuestionsService {
     };
   }
 
-  // async update(id: string, updateQuestionDto: UpdateQuestionDto) {
-  //   await this.questionsRepository
-  //     .createQueryBuilder()
-  //     .update()
-  //     .set(updateQuestionDto)
-  //     .where('id = :id', { id })
-  //     .execute();
+  // UPDATE
+  async update(id: string, updateDto: UpdateQuestionDto) {
+    const { options, ...questionData } = updateDto; // Extract options from the DTO
 
-  //   return {
-  //     success: true,
-  //     message: 'Question updated successfully',
-  //     data: {
-  //       id,
-  //       ...updateQuestionDto,
-  //     },
-  //   };
-  // }
+    // Step 1: Delete all old options for the question using QueryBuilder
+    await this.optionsRepository
+      .createQueryBuilder()
+      .delete()
+      .where('question_id = :id', { id })
+      .execute();
 
+    // Step 2: Update the question data using QueryBuilder
+    await this.questionsRepository
+      .createQueryBuilder()
+      .update()
+      .set(questionData) // Update the fields except 'options'
+      .where('id = :id', { id })
+      .execute();
+
+    // Step 3: Add new options if they exist
+    if (options && options.length > 0) {
+      const newOptions = options.map((option) => ({
+        ...option,
+        question: { id }, // Associate the options with the question
+      }));
+
+      // Insert new options into the 'options' table
+      await this.optionsRepository
+        .createQueryBuilder()
+        .insert()
+        .into(Option)
+        .values(newOptions)
+        .execute();
+    }
+
+    // Step 4: Return the updated question data
+    const updatedQuestion = await this.questionsRepository.findOne({
+      where: { id },
+      relations: [
+        'subject',
+        'subSubject',
+        'createdBy',
+        'processedBy',
+        'options',
+      ],
+    });
+
+    return {
+      success: true,
+      message: 'Question and options updated successfully',
+      data: updatedQuestion,
+    };
+  }
+
+  //DELETE
   async delete(id: string) {
     const query = this.questionsRepository
       .createQueryBuilder()

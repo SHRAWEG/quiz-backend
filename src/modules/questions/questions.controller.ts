@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -13,6 +14,7 @@ import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthRolesGuard } from '../auth/guards/auth-role.gaurd';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { QuestionsService } from './questions.service';
+import { UpdateQuestionDto } from './dto/update-question.dto';
 
 @Controller('questions')
 export class QuestionsController {
@@ -99,13 +101,13 @@ export class QuestionsController {
     return this.questionService.getById(id);
   }
 
-  // @Put(':id')
-  // update(
-  //   @Param('id') id: string,
-  //   @Body() updateQuestionDto: UpdateQuestionDto,
-  // ) {
-  //   return this.questionService.update(id, updateQuestionDto);
-  // }
+  @Put(':id')
+  update(
+    @Param('id') id: string,
+    @Body() updateQuestionDto: UpdateQuestionDto,
+  ) {
+    return this.questionService.update(id, updateQuestionDto);
+  }
 
   @Delete(':id')
   delete(@Param('id') id: string) {
