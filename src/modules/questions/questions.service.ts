@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Request } from 'express';
 import { ApiResponse } from 'src/common/classes/api-response';
+import { JwtPayload } from 'src/common/interfaces/jwt-payload.interface';
 import { Repository } from 'typeorm';
 import { Option } from '../options/entities/option.entity';
 import { SubSubjectsService } from '../sub-subjects/sub-subjects.service';
@@ -16,11 +19,12 @@ export class QuestionsService {
     @InjectRepository(Option)
     private readonly optionsRepository: Repository<Option>,
     private readonly subSubjectService: SubSubjectsService,
+    @Inject(REQUEST) private readonly request: Request,
   ) {}
 
   async create(
     dto: CreateQuestionDto,
-    id: string,
+    user: JwtPayload,
   ): Promise<ApiResponse<object>> {
     const { options, ...questionData } = dto;
 
@@ -39,7 +43,7 @@ export class QuestionsService {
       ...questionData,
       subjectId: subSubject?.data?.subjectId,
       options: optionsToCreate,
-      createdById: id,
+      createdById: user.sub,
     });
 
     const savedQuestion = await this.questionsRepository.save(newQuestion);
@@ -50,7 +54,6 @@ export class QuestionsService {
       data: savedQuestion,
     };
   }
-
   async get(
     page: number,
     limit: number,
@@ -58,6 +61,8 @@ export class QuestionsService {
     subjectId?: string,
     subSubjectId?: string,
   ) {
+    const user = !this.request?.user;
+    console.log(user);
     const skip = (page - 1) * limit;
 
     const query = this.questionsRepository

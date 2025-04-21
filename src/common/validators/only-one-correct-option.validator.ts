@@ -11,16 +11,14 @@ import { CreateOptionDto } from 'src/modules/options/dto/create-option.dto';
 export class OnlyOneCorrectOptionConstraint
   implements ValidatorConstraintInterface
 {
-  validate(options: CreateOptionDto[], args?: ValidationArguments) {
-    console.log('ARGS : ', args);
+  validate(options: CreateOptionDto[]) {
     if (!Array.isArray(options)) return false;
     const correctCount = options.filter((opt) => opt.isCorrect === true).length;
     return correctCount === 1;
   }
 
   defaultMessage(args: ValidationArguments) {
-    console.log('ARGS : ', args);
-    return `Exactly one option must be marked as correct`;
+    return `The property '${args.property}' in '${args.targetName}' must have exactly one option marked as correct.`;
   }
 }
 

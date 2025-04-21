@@ -25,8 +25,6 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       exceptionFactory(errors) {
-        console.log('ERRORS : ');
-        console.log('ERRORRS : ', errors);
         const formattedErrors = formatClassValidatorErrors(errors);
         throw new ValidationException(formattedErrors);
       },

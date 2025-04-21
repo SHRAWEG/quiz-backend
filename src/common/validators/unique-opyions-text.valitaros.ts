@@ -11,8 +11,7 @@ import { CreateOptionDto } from 'src/modules/options/dto/create-option.dto';
 export class UniqueOptionsTextConstraint
   implements ValidatorConstraintInterface
 {
-  validate(options: CreateOptionDto[], args: ValidationArguments) {
-    console.log('ARGS : ', args);
+  validate(options: CreateOptionDto[]) {
     if (!Array.isArray(options)) return false;
 
     const texts = options.map((opt) => opt.option?.trim().toLowerCase());
@@ -21,8 +20,7 @@ export class UniqueOptionsTextConstraint
   }
 
   defaultMessage(args: ValidationArguments) {
-    console.log('ARGS : ', args);
-    return `Option texts must be unique`;
+    return `The property '${args.property}' in '${args.targetName}' must have unique option texts.`;
   }
 }
 

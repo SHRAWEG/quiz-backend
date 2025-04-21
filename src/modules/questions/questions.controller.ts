@@ -14,6 +14,7 @@ import {
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
+import { JwtPayload } from 'src/common/interfaces/jwt-payload.interface';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
 import { User } from '../users/entities/user.entity';
@@ -30,12 +31,11 @@ export class QuestionsController {
   @Post()
   async addQuestion(
     @Body() createQuestionDto: CreateQuestionDto,
-    @Req() req: Request & { user: { id: string; email: string } },
+    @Req() req: Request & { user: JwtPayload },
   ) {
     // Get the whole request object with .user)
     const user = req.user;
-    console.log(user);
-    return this.questionService.create(createQuestionDto, user.id);
+    return this.questionService.create(createQuestionDto, user);
   }
 
   @Get()

@@ -34,8 +34,6 @@ export function formatClassValidatorErrors(
   processErrors(errors);
   return formattedErrors;
 
-  // console.log('TRYING TO FORMAT :: ', JSON.stringify(errors));
-
   // for (const error of errors) {
   //   const property = error.property;
   //   const constraints = error.constraints;
