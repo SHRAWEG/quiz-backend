@@ -12,15 +12,16 @@ import {
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
+import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { SubjectsService } from './subjects.service';
 
 @Controller('subjects')
-@UseGuards(RolesGuard)
-@ApiBearerAuth()
+@UseGuards(AuthGuard, RolesGuard)
 @Roles(Role.Admin)
+@ApiBearerAuth()
 export class SubjectsController {
   constructor(private readonly subjectsService: SubjectsService) {}
 

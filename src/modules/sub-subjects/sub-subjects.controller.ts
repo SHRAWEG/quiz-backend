@@ -16,9 +16,10 @@ import { RolesGuard } from '../auth/guards/role.gaurd';
 import { CreateSubSubjectDto } from './dto/create-sub-subject.dto';
 import { UpdateSubSubjectDto } from './dto/update-sub-subject.dto';
 import { SubSubjectsService } from './sub-subjects.service';
+import { AuthGuard } from '../auth/guards/auth.guard';
 
 @Controller('sub-subjects')
-@UseGuards(RolesGuard)
+@UseGuards(AuthGuard, RolesGuard)
 @ApiBearerAuth()
 @Roles(Role.Admin)
 export class SubSubjectsController {
