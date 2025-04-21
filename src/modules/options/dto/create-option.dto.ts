@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsBoolean, IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateOptionDto {
@@ -8,6 +9,7 @@ export class CreateOptionDto {
   option: string;
 
   @ApiProperty({ description: 'Whether the option is correct', example: true })
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   @IsNotEmpty()
   isCorrect: boolean;

@@ -2,13 +2,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsEnum,
   IsNotEmpty,
   IsString,
   IsUUID,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { OnlyOneCorrectOption } from 'src/common/validators/only-one-correct-option.validator';
+import { UniqueOptionsText } from 'src/common/validators/unique-opyions-text.valitaros';
 import { CreateOptionDto } from 'src/modules/options/dto/create-option.dto';
 import { DifficultyLevel, QuestionType } from '../entities/question.entity';
 
@@ -27,6 +32,11 @@ export class CreateQuestionDto {
   })
   @IsArray()
   @Type(() => CreateOptionDto)
+  @ValidateNested({ each: true })
+  @ArrayMinSize(4)
+  @ArrayMaxSize(4)
+  @OnlyOneCorrectOption({ message: 'There must be exactly one correct option' })
+  @UniqueOptionsText({ message: 'Option texts must be unique' })
   options: CreateOptionDto[];
 
   @ApiProperty({ enum: QuestionType, description: 'The type of the question' })
