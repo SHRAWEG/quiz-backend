@@ -8,16 +8,13 @@ import {
   Post,
   Put,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
-import { JwtPayload } from 'src/common/interfaces/jwt-payload.interface';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
-import { User } from '../users/entities/user.entity';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { QuestionsService } from './questions.service';
@@ -29,13 +26,8 @@ import { QuestionsService } from './questions.service';
 export class QuestionsController {
   constructor(private readonly questionService: QuestionsService) {}
   @Post()
-  async addQuestion(
-    @Body() createQuestionDto: CreateQuestionDto,
-    @Req() req: Request & { user: JwtPayload },
-  ) {
-    // Get the whole request object with .user)
-    const user = req.user;
-    return this.questionService.create(createQuestionDto, user);
+  async addQuestion(@Body() createQuestionDto: CreateQuestionDto) {
+    return this.questionService.create(createQuestionDto);
   }
 
   @Get()
@@ -120,16 +112,14 @@ export class QuestionsController {
 
   @Patch('approve/:id')
   @ApiBearerAuth()
-  updateStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
-    const processedbyId = req.user.id;
-    return this.questionService.approveQuestion(id, processedbyId);
+  updateStatus(@Param('id') id: string) {
+    return this.questionService.approveQuestion(id);
   }
 
   @Patch('approrejectve/:id')
   @ApiBearerAuth()
-  rejectStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
-    const processedbyId = req.user.id;
-    return this.questionService.rejectQuestion(id, processedbyId);
+  rejectStatus(@Param('id') id: string) {
+    return this.questionService.rejectQuestion(id);
   }
 
   @Delete(':id')

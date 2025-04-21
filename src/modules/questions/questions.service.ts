@@ -1,9 +1,15 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { ApiResponse } from 'src/common/classes/api-response';
-import { JwtPayload } from 'src/common/interfaces/jwt-payload.interface';
+import { Role } from 'src/common/enums/roles.enum';
 import { Repository } from 'typeorm';
 import { Option } from '../options/entities/option.entity';
 import { SubSubjectsService } from '../sub-subjects/sub-subjects.service';
@@ -22,10 +28,8 @@ export class QuestionsService {
     @Inject(REQUEST) private readonly request: Request,
   ) {}
 
-  async create(
-    dto: CreateQuestionDto,
-    user: JwtPayload,
-  ): Promise<ApiResponse<object>> {
+  async create(dto: CreateQuestionDto): Promise<ApiResponse<object>> {
+    const user = this.request.user;
     const { options, ...questionData } = dto;
 
     const optionsToCreate = options.map((opt) =>
@@ -43,7 +47,7 @@ export class QuestionsService {
       ...questionData,
       subjectId: subSubject?.data?.subjectId,
       options: optionsToCreate,
-      createdById: user.sub,
+      createdById: user?.sub,
     });
 
     const savedQuestion = await this.questionsRepository.save(newQuestion);
@@ -54,6 +58,7 @@ export class QuestionsService {
       data: savedQuestion,
     };
   }
+
   async get(
     page: number,
     limit: number,
@@ -61,8 +66,7 @@ export class QuestionsService {
     subjectId?: string,
     subSubjectId?: string,
   ) {
-    const user = !this.request?.user;
-    console.log(user);
+    const user = this.request?.user;
     const skip = (page - 1) * limit;
 
     const query = this.questionsRepository
@@ -85,6 +89,9 @@ export class QuestionsService {
     }
     if (subSubjectId) {
       query.andWhere('question.subSubjectId = :subSubjectId', { subSubjectId });
+    }
+    if (user?.role !== Role.Admin) {
+      query.andWhere('question.createdById = :userId', { userId: user?.sub });
     }
 
     const [data, totalItems] = await query.getManyAndCount();
@@ -128,6 +135,7 @@ export class QuestionsService {
   }
 
   async getById(id: string) {
+    const user = this.request?.user;
     const question = await this.questionsRepository
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.subject', 'subject')
@@ -136,7 +144,26 @@ export class QuestionsService {
       .leftJoinAndSelect('question.processedBy', 'processedBy')
       .leftJoinAndSelect('question.options', 'options')
       .where('question.id = :id', { id })
+      .andWhere('question.createdById = :userId', { userId: user?.sub })
       .getOne();
+
+    if (!question) {
+      return {
+        success: false,
+        message: 'Question not found',
+        data: null,
+      };
+    }
+
+    if (user?.role !== Role.Admin) {
+      if (question.createdById !== user?.sub) {
+        return {
+          success: false,
+          message: 'You are not authorized to view this question',
+          data: null,
+        };
+      }
+    }
 
     return {
       success: true,
@@ -146,14 +173,27 @@ export class QuestionsService {
   }
 
   async update(id: string, updateDto: UpdateQuestionDto) {
+    const user = this.request?.user;
+    if (!user) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
     const { options, ...questionData } = updateDto;
 
-    await this.optionsRepository
-      .createQueryBuilder()
-      .delete()
-      .where('question_id = :id', { id })
-      .execute();
+    // First, check ownership
+    const question = await this.questionsRepository.findOne({
+      where: { id, createdBy: { id: user.sub } },
+    });
 
+    if (!question) {
+      return {
+        success: false,
+        message: 'Question not found',
+        data: null,
+      };
+    }
+
+    // Update question details
     await this.questionsRepository
       .createQueryBuilder()
       .update()
@@ -161,7 +201,14 @@ export class QuestionsService {
       .where('id = :id', { id })
       .execute();
 
+    // Handle options (remove old ones and insert new)
     if (options && options.length > 0) {
+      await this.optionsRepository
+        .createQueryBuilder()
+        .delete()
+        .where('questionId = :id', { id })
+        .execute();
+
       const newOptions = options.map((option) => ({
         ...option,
         question: { id },
@@ -175,6 +222,7 @@ export class QuestionsService {
         .execute();
     }
 
+    // Fetch updated question
     const updatedQuestion = await this.questionsRepository
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.subject', 'subject')
@@ -192,13 +240,14 @@ export class QuestionsService {
     };
   }
 
-  async approveQuestion(id: string, processedById: string) {
+  async approveQuestion(id: string) {
+    const user = this.request?.user;
     const result = await this.questionsRepository
       .createQueryBuilder()
       .update()
       .set({
         status: QuestionStatus.APPROVED,
-        processedById,
+        processedById: user?.sub,
       })
       .where('id = :id', { id })
       .execute();
@@ -214,13 +263,14 @@ export class QuestionsService {
     };
   }
 
-  async rejectQuestion(id: string, processedById: string) {
+  async rejectQuestion(id: string) {
+    const user = this.request?.user;
     const result = await this.questionsRepository
       .createQueryBuilder()
       .update()
       .set({
         status: QuestionStatus.REJECTED,
-        processedById,
+        processedById: user?.sub,
       })
       .where('id = :id', { id })
       .execute();
@@ -237,11 +287,21 @@ export class QuestionsService {
   }
 
   async delete(id: string) {
+    const user = this.request?.user;
+
     const result = await this.questionsRepository
       .createQueryBuilder()
       .delete()
+      .from(Question)
       .where('id = :id', { id })
+      .andWhere('createdById = :userId', { userId: user?.sub })
       .execute();
+
+    if (result.affected === 0) {
+      throw new ForbiddenException(
+        'You are not authorized to delete this question or it does not exist.',
+      );
+    }
 
     return {
       success: true,
