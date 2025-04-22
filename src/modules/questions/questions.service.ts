@@ -136,16 +136,19 @@ export class QuestionsService {
 
   async getById(id: string) {
     const user = this.request?.user;
-    const question = await this.questionsRepository
+    const query = this.questionsRepository
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.subject', 'subject')
       .leftJoinAndSelect('question.subSubject', 'subSubject')
       .leftJoinAndSelect('question.createdBy', 'createdBy')
       .leftJoinAndSelect('question.processedBy', 'processedBy')
       .leftJoinAndSelect('question.options', 'options')
-      .where('question.id = :id', { id })
-      .andWhere('question.createdById = :userId', { userId: user?.sub })
-      .getOne();
+      .where('question.id = :id', { id });
+
+    if (user?.role !== Role.Admin) {
+      query.andWhere('question.createdById = :userId', { userId: user?.sub });
+    }
+    const question = await query.getOne();
 
     if (!question) {
       return {

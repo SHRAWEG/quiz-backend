@@ -6,6 +6,10 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/update-auth.dto';
 import { AuthGuard } from './guards/auth.guard';
 
+interface ResendVerificationDto {
+  email: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -32,20 +36,18 @@ export class AuthController {
   }
 
   @Post('resend-verification')
-  @UseGuards(AuthGuard)
-  async resendVerification(@Body() userId: string) {
-    const user = await this.usersService.findUserById(userId);
+  async resendVerification(
+    @Body() resendVerificationDto: ResendVerificationDto,
+  ) {
+    const { email } = resendVerificationDto;
+    const user = await this.usersService.findUserByEmail(email);
 
     if (!user) {
-      return {
-        message: 'User not found',
-      };
+      throw new Error('User not found');
     }
 
     if (user.isEmailVerified) {
-      return {
-        message: 'Email is already verified',
-      };
+      throw new Error('Email already verified');
     }
 
     await this.usersService.sendVerificationEmail(user);

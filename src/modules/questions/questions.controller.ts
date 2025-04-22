@@ -26,6 +26,7 @@ import { QuestionsService } from './questions.service';
 export class QuestionsController {
   constructor(private readonly questionService: QuestionsService) {}
   @Post()
+  @Roles(Role.Admin, Role.Teacher)
   async addQuestion(@Body() createQuestionDto: CreateQuestionDto) {
     return this.questionService.create(createQuestionDto);
   }
@@ -116,7 +117,7 @@ export class QuestionsController {
     return this.questionService.approveQuestion(id);
   }
 
-  @Patch('approrejectve/:id')
+  @Patch('reject/:id')
   @ApiBearerAuth()
   rejectStatus(@Param('id') id: string) {
     return this.questionService.rejectQuestion(id);

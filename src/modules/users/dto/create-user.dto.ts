@@ -50,4 +50,9 @@ export class CreateUserDto {
   @IsString()
   @MinLength(6)
   password: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(6)
+  confirmPassword: string;
 }
