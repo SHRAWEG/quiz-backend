@@ -18,8 +18,8 @@ export enum QuestionType {
   LONG = 'long',
   SHORT = 'short',
   MCQ = 'mcq',
-  TRUE_OR_FALSE = 'trueOrFalse',
-  FILL_IN_THE_BLANKS = 'fillInTheBlanks',
+  TRUE_OR_FALSE = 'true-or-false',
+  FILL_IN_THE_BLANKS = 'fill-in-the-blanks',
 }
 
 export enum DifficultyLevel {
@@ -64,6 +64,17 @@ export class Question {
   })
   status: string;
 
+  @OneToMany(() => Option, (option) => option.question, {
+    cascade: ['insert', 'update', 'remove'],
+  })
+  options?: Option[];
+
+  @Column({ type: 'boolean', nullable: true })
+  correctAnswerBoolean?: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  correctAnswerText?: string;
+
   @Column({ type: 'text' })
   createdById: string;
 
@@ -79,11 +90,6 @@ export class Question {
     onUpdate: 'CURRENT_TIMESTAMP',
   })
   updatedAt: Date;
-
-  @OneToMany(() => Option, (option) => option.question, {
-    cascade: ['insert', 'update', 'remove'],
-  })
-  options: Option[];
 
   @ManyToOne(() => Subject, {
     cascade: ['insert', 'update', 'remove'],

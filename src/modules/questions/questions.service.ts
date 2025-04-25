@@ -15,7 +15,11 @@ import { Option } from '../options/entities/option.entity';
 import { SubSubjectsService } from '../sub-subjects/sub-subjects.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
-import { Question, QuestionStatus } from './entities/question.entity';
+import {
+  Question,
+  QuestionStatus,
+  QuestionType,
+} from './entities/question.entity';
 
 @Injectable()
 export class QuestionsService {
@@ -30,27 +34,49 @@ export class QuestionsService {
 
   async create(dto: CreateQuestionDto): Promise<ApiResponse<object>> {
     const user = this.request.user;
-    const { options, ...questionData } = dto;
 
-    const optionsToCreate = options.map((opt) =>
-      this.optionsRepository.create({
-        option: opt.option,
-        isCorrect: opt.isCorrect,
-      }),
-    );
+    const {
+      options,
+      correctAnswerBoolean,
+      correctAnswerText,
+      type,
+      ...questionData
+    } = dto;
 
     const subSubject = await this.subSubjectService.getById(
       questionData.subSubjectId,
     );
 
-    const newQuestion = this.questionsRepository.create({
+    // Create base question entity
+    const baseQuestion = this.questionsRepository.create({
       ...questionData,
+      type,
       subjectId: subSubject?.data?.subjectId,
-      options: optionsToCreate,
       createdById: user?.sub,
     });
 
-    const savedQuestion = await this.questionsRepository.save(newQuestion);
+    // Conditionally handle additional fields based on type
+    if (type === QuestionType.MCQ) {
+      baseQuestion.options =
+        options &&
+        options.map((opt) =>
+          this.optionsRepository.create({
+            option: opt.option,
+            isCorrect: opt.isCorrect,
+          }),
+        );
+    }
+
+    if (type === QuestionType.TRUE_OR_FALSE) {
+      baseQuestion.correctAnswerBoolean = correctAnswerBoolean;
+    }
+
+    if (type === QuestionType.FILL_IN_THE_BLANKS) {
+      baseQuestion.correctAnswerText = correctAnswerText;
+    }
+
+    // Save the question
+    const savedQuestion = await this.questionsRepository.save(baseQuestion);
 
     return {
       success: true,
@@ -76,6 +102,7 @@ export class QuestionsService {
       .leftJoinAndSelect('question.createdBy', 'createdBy')
       .leftJoinAndSelect('question.processedBy', 'processedBy')
       .leftJoinAndSelect('question.options', 'options')
+      .orderBy('question.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
 
@@ -111,7 +138,8 @@ export class QuestionsService {
     const query = this.questionsRepository
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.subSubject', 'subSubject')
-      .leftJoinAndSelect('question.options', 'options');
+      .leftJoinAndSelect('question.options', 'options')
+      .orderBy('question.createdAt', 'DESC');
 
     if (search) {
       query.andWhere('question.question ILIKE :search', {

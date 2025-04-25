@@ -1,18 +1,21 @@
 // create-question.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsString,
   IsUUID,
   MaxLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { IsUnique } from 'src/common/decorators/is-unique.decorator';
+import { ForbidIfNotType } from 'src/common/validators/forbid-if-not-type.decorator';
 import { OnlyOneCorrectOption } from 'src/common/validators/only-one-correct-option.validator';
 import { UniqueOptionsText } from 'src/common/validators/unique-opyions-text.valitaros';
 import { CreateOptionDto } from 'src/modules/options/dto/create-option.dto';
@@ -37,14 +40,41 @@ export class CreateQuestionDto {
     minItems: 4,
     maxItems: 4,
   })
+  @ValidateIf((o: CreateQuestionDto) => o.type === QuestionType.MCQ)
   @IsArray()
-  @Type(() => CreateOptionDto)
-  @ValidateNested({ each: true })
   @ArrayMinSize(4)
   @ArrayMaxSize(4)
-  @OnlyOneCorrectOption({ message: 'There must be exactly one correct option' })
-  @UniqueOptionsText({ message: 'Option texts must be unique' })
-  options: CreateOptionDto[];
+  @ValidateNested({ each: true })
+  @Type(() => CreateOptionDto)
+  @OnlyOneCorrectOption()
+  @UniqueOptionsText()
+  @ForbidIfNotType(QuestionType.MCQ, {
+    message: 'Options are only allowed for MCQ type',
+  })
+  options?: CreateOptionDto[];
+
+  // True/False (only for trueOrFalse)
+  @ApiPropertyOptional({
+    description: 'Correct answer (true/false) for True/False questions',
+    example: true,
+  })
+  @ValidateIf((o: CreateQuestionDto) => o.type === QuestionType.TRUE_OR_FALSE)
+  @IsBoolean()
+  @ForbidIfNotType(QuestionType.TRUE_OR_FALSE)
+  correctAnswerBoolean?: boolean;
+
+  // Fill in the blanks (only for fillInTheBlanks)
+  @ApiPropertyOptional({
+    description: 'Correct text for Fill in the Blanks questions',
+    example: 'apple',
+  })
+  @ValidateIf(
+    (o: CreateQuestionDto) => o.type === QuestionType.FILL_IN_THE_BLANKS,
+  )
+  @IsString()
+  @IsNotEmpty()
+  @ForbidIfNotType(QuestionType.FILL_IN_THE_BLANKS)
+  correctAnswerText?: string;
 
   @ApiProperty({ enum: QuestionType, description: 'The type of the question' })
   @IsEnum(QuestionType)
