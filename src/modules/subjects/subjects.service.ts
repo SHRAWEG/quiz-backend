@@ -20,14 +20,6 @@ export class SubjectsService {
   async create(createSubjectDto: CreateSubjectDto) {
     const validationErrors: ValidationError = {};
 
-    if (
-      await this.subjectRepository.exists({
-        where: { name: createSubjectDto.name },
-      })
-    ) {
-      validationErrors['name'] = ['Subject name already exists'];
-    }
-
     if (validationErrors && Object.keys(validationErrors).length > 0) {
       throw new ValidationException(validationErrors);
     }
