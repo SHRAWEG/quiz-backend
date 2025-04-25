@@ -107,7 +107,11 @@ export class UsersService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...user } = savedUser;
 
-    await this.sendVerificationEmail(savedUser);
+    try {
+      await this.sendVerificationEmail(savedUser);
+    } catch (error) {
+      console.error('Error sending verification email:', error);
+    }
 
     return new ApiResponse({
       message: 'User created successfully.',
@@ -159,6 +163,44 @@ export class UsersService {
     // Send the verification email
     await this.emailService.sendVerificationEmail(user.email, token);
   }
+
+  /**
+   * Resends verification mail to the user provided email.
+   *
+   * @param {User} user - The user object containing the email address to send the verification to.
+   * @returns {Promise<void>} A promise that resolves when the mail is sent.
+   */
+  async resendVerificationEmail(user: User): Promise<void> {
+    // Check existing verification token
+    const existingToken = await this.verificationTokenRepo.findOneBy({
+      userId: user.id,
+    });
+
+    if (existingToken) {
+      // If a token exists, expire it to prevent reuse
+      existingToken.expiresAt = new Date(); // Set to past date to expire it
+      existingToken.expiresAt.setHours(existingToken.expiresAt.getHours() - 1); // Expire the token
+
+      //save the expired token
+      await this.verificationTokenRepo.save(existingToken);
+    }
+
+    // Create a verification token
+    const token = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24); // Token expires in 24 hours
+
+    // Save the token
+    await this.verificationTokenRepo.save({
+      token,
+      userId: user.id,
+      expiresAt,
+    });
+
+    // Send the verification email
+    await this.emailService.sendVerificationEmail(user.email, token);
+  }
+
   /**
    * Verifies email of the user by verifying the provided token.
    *
@@ -189,6 +231,11 @@ export class UsersService {
 
     // Delete the used token
     await this.verificationTokenRepo.remove(verificationToken);
+
+    // Delete all expired tokens
+    await this.verificationTokenRepo.delete({
+      userId: verificationToken.userId,
+    });
   }
 
   /**

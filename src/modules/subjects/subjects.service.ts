@@ -1,5 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import {
+  ValidationError,
+  ValidationException,
+} from 'src/common/exceptions/validation.exception';
 import { Repository } from 'typeorm';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
@@ -14,6 +18,19 @@ export class SubjectsService {
 
   // CREATE
   async create(createSubjectDto: CreateSubjectDto) {
+    const validationErrors: ValidationError = {};
+
+    if (
+      await this.subjectRepository.exists({
+        where: { name: createSubjectDto.name },
+      })
+    ) {
+      validationErrors['name'] = ['Subject name already exists'];
+    }
+
+    if (validationErrors && Object.keys(validationErrors).length > 0) {
+      throw new ValidationException(validationErrors);
+    }
     const queryBuilder = this.subjectRepository
       .createQueryBuilder()
       .insert()
@@ -126,7 +143,7 @@ export class SubjectsService {
     const result = await queryBuilder.execute();
 
     if (result.affected === 0) {
-      throw new Error('Subject not found');
+      throw new NotFoundException('Subject not found');
     }
 
     return {

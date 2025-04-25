@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiQuery } from '@nestjs/swagger';
 import { AuthUser } from 'src/common/decorators/auth-user.decorator';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UsersService } from '../users/users.service';
@@ -28,7 +37,13 @@ export class AuthController {
   }
 
   @Get('verify-email')
-  async verifyEmail(token: string) {
+  @ApiQuery({
+    name: 'token',
+    required: true,
+    type: String,
+    description: 'Verification token',
+  })
+  async verifyEmail(@Query('token') token: string) {
     await this.usersService.verifyEmail(token);
     return {
       message: 'Email verified successfully',
@@ -43,14 +58,14 @@ export class AuthController {
     const user = await this.usersService.findUserByEmail(email);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new BadRequestException('User not found');
     }
 
     if (user.isEmailVerified) {
-      throw new Error('Email already verified');
+      throw new BadRequestException('Email already verified');
     }
 
-    await this.usersService.sendVerificationEmail(user);
+    await this.usersService.resendVerificationEmail(user);
     return {
       message: 'Verification email sent successfully',
     };
