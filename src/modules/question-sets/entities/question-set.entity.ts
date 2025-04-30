@@ -1,16 +1,32 @@
+import { Category } from 'src/modules/categories/entities/category.entity';
 import { Question } from 'src/modules/questions/entities/question.entity';
 import {
   Column,
   Entity,
+  JoinColumn,
   JoinTable,
   ManyToMany,
+  ManyToOne,
   PrimaryGeneratedColumn,
+  Relation,
 } from 'typeorm';
 
 @Entity()
 export class QuestionSet {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column({ default: false })
+  isFree: boolean;
+
+  @Column({ type: 'text' })
+  categoryId: string;
+
+  @ManyToOne(() => Category, {
+    cascade: ['insert', 'update', 'remove'],
+  })
+  @JoinColumn({ name: 'category_id' })
+  category: Relation<Category>;
 
   @Column()
   name: string;

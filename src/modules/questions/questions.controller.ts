@@ -27,7 +27,7 @@ export class QuestionsController {
   constructor(private readonly questionService: QuestionsService) {}
   @Post()
   @Roles(Role.Admin, Role.Teacher)
-  async addQuestion(@Body() createQuestionDto: CreateQuestionDto) {
+  addQuestion(@Body() createQuestionDto: CreateQuestionDto) {
     return this.questionService.create(createQuestionDto);
   }
 
@@ -55,14 +55,20 @@ export class QuestionsController {
     name: 'subjectId',
     required: false,
     type: String,
-    description: 'Subject Id to filter sub-subjects',
+    description: 'Subject Id to filter subjects',
+  })
+  @ApiQuery({
+    name: 'subSubjectId',
+    required: false,
+    type: String,
+    description: 'Sub Subject Id to filter sub-subjects',
   })
   get(
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
     @Query('search') search: string = '',
     @Query('subjectId') subjectId?: string,
-    @Query('subjectId') subSubjectId?: string,
+    @Query('subSubjectId') subSubjectId?: string,
   ) {
     const pageNumber = parseInt(page, 10);
     const limitNumber = parseInt(limit, 10);

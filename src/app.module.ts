@@ -16,7 +16,10 @@ import { UsersService } from './modules/users/users.service';
 // MODULES
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CategoriesModule } from './modules/categories/category.module';
+import { Category } from './modules/categories/entities/category.entity';
 import { OptionsModule } from './modules/options/options.module';
+import { QuestionSet } from './modules/question-sets/entities/question-set.entity';
 import { QuestionSetsModule } from './modules/question-sets/question-sets.module';
 import { QuestionsModule } from './modules/questions/questions.module';
 import { SubSubjectsModule } from './modules/sub-subjects/sub-subjects.module';
@@ -32,6 +35,8 @@ import { UsersModule } from './modules/users/users.module';
       SubSubject,
       User,
       VerificationToken,
+      Category,
+      QuestionSet,
     ]), // Importing Role and User entities
     ConfigModule.forRoot({
       isGlobal: true,
@@ -55,6 +60,7 @@ import { UsersModule } from './modules/users/users.module';
     SubSubjectsModule,
     UsersModule,
     QuestionSetsModule,
+    CategoriesModule,
   ],
   controllers: [],
   providers: [UsersService, EmailService],

@@ -3,7 +3,6 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -205,15 +204,16 @@ export class QuestionsService {
 
   async update(id: string, updateDto: UpdateQuestionDto) {
     const user = this.request?.user;
-    if (!user) {
-      throw new UnauthorizedException('User not authenticated');
-    }
 
     const { options, ...questionData } = updateDto;
 
+    const subSubject = await this.subSubjectService.getById(
+      questionData.subSubjectId,
+    );
+
     // First, check ownership
     const question = await this.questionsRepository.findOne({
-      where: { id, createdBy: { id: user.sub } },
+      where: { id, createdBy: { id: user!.sub } },
     });
 
     if (!question) {
@@ -228,7 +228,7 @@ export class QuestionsService {
     await this.questionsRepository
       .createQueryBuilder()
       .update()
-      .set(questionData)
+      .set({ ...questionData, subjectId: subSubject?.data?.subjectId })
       .where('id = :id', { id })
       .execute();
 

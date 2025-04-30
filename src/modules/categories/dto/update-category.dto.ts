@@ -1,11 +1,11 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsNotEmpty, IsString } from 'class-validator';
-import { CreateSubjectDto } from './create-subject.dto';
+import { CreateCategoryDto } from './create-category.dto';
 
-export class UpdateSubjectDto extends PartialType(CreateSubjectDto) {
+export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {
   @ApiProperty({
     description: 'The name of the sub-subject',
-    example: 'Mathematics',
+    example: 'ILETS',
   })
   @IsNotEmpty()
   @IsString()

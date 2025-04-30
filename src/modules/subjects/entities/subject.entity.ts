@@ -13,6 +13,6 @@ export class Subject {
   @OneToMany(() => SubSubject, (subSubject) => subSubject.subject)
   subSubject: SubSubject[];
 
-  @OneToMany(() => Question, (question) => question.options)
+  @OneToMany(() => Question, (question) => question.subject)
   question: Question[];
 }
