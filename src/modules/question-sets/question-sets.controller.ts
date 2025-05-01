@@ -16,6 +16,7 @@ import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
+import { AddQuestionDto } from './dto/add-question-dto';
 import { CreateQuestionSetDto } from './dto/create-question-set.dto';
 import { QuestionSetsService } from './question-sets.service';
 
@@ -29,6 +30,16 @@ export class QuestionSetsController {
   @Post()
   create(@Body() dto: CreateQuestionSetDto) {
     return this.questionSetService.create(dto);
+  }
+
+  @Post('/add-question')
+  addQuestion(@Body() dto: AddQuestionDto) {
+    return this.questionSetService.addQuestion(dto);
+  }
+
+  @Post('/remove-question')
+  removeQuestion(@Body() dto: AddQuestionDto) {
+    return this.questionSetService.removeQuestion(dto);
   }
 
   @Get()
@@ -61,10 +72,11 @@ export class QuestionSetsController {
     return this.questionSetService.get(pageNumber, limitNumber, search);
   }
 
-  // @Get()
-  // findAll() {
-  //   return this.questionSetService.findAll();
-  // }
+  @Get(':id')
+  @Roles(Role.Admin, Role.Teacher)
+  findOne(@Param('id') id: string) {
+    return this.questionSetService.getById(id);
+  }
 
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {

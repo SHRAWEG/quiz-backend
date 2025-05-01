@@ -18,7 +18,7 @@ import { CategoriesService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
-@Controller('subjects')
+@Controller('categories')
 @UseGuards(AuthGuard, RolesGuard)
 @Roles(Role.Admin)
 @ApiBearerAuth()

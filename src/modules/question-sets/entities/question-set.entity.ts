@@ -1,5 +1,6 @@
 import { Category } from 'src/modules/categories/entities/category.entity';
 import { Question } from 'src/modules/questions/entities/question.entity';
+import { User } from 'src/modules/users/entities/user.entity';
 import {
   Column,
   Entity,
@@ -11,10 +12,15 @@ import {
   Relation,
 } from 'typeorm';
 
+export enum QuestionSetStatus {
+  DRAFT = 'draft',
+  PUBLISHED = 'published',
+}
+
 @Entity()
 export class QuestionSet {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column({ default: false })
   isFree: boolean;
@@ -22,11 +28,23 @@ export class QuestionSet {
   @Column({ type: 'text' })
   categoryId: string;
 
+  @Column()
+  status: QuestionSetStatus;
+
+  @Column({ type: 'text' })
+  createdById: string;
+
   @ManyToOne(() => Category, {
     cascade: ['insert', 'update', 'remove'],
   })
   @JoinColumn({ name: 'category_id' })
   category: Relation<Category>;
+
+  @ManyToOne(() => User, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'created_by_id' })
+  createdBy: Relation<User>;
 
   @Column()
   name: string;
@@ -34,11 +52,11 @@ export class QuestionSet {
   @JoinTable({
     name: 'question_sets_questions',
     joinColumn: {
-      name: 'questionSetId',
+      name: 'question_set_id',
       referencedColumnName: 'id',
     },
     inverseJoinColumn: {
-      name: 'questionId',
+      name: 'question_id',
       referencedColumnName: 'id',
     },
   })
