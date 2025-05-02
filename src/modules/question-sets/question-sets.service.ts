@@ -221,7 +221,7 @@ export class QuestionSetsService {
       .createQueryBuilder('questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
       .leftJoinAndSelect('question.options', 'option')
-      .where('question.id = :id', { id });
+      .where('questionSet.id = :id', { id });
 
     const questionSet = await query.getOne();
 
