@@ -13,6 +13,7 @@ import { Repository } from 'typeorm';
 import { Question } from '../questions/entities/question.entity';
 import { AddQuestionDto } from './dto/add-question-dto';
 import { CreateQuestionSetDto } from './dto/create-question-set.dto';
+import { UpdateQuestionSetDto } from './dto/update-question-set.dto';
 import { QuestionSet, QuestionSetStatus } from './entities/question-set.entity';
 
 @Injectable()
@@ -82,11 +83,12 @@ export class QuestionSetsService {
   async addQuestion(dto: AddQuestionDto) {
     // 1. Load the QuestionSet with its related Question IDs
     const questionSet = await this.questionSetRepository
-      .createQueryBuilder('qs')
-      .leftJoinAndSelect('qs.questions', 'q') // This automatically joins the relation via the join table
-      .leftJoinAndSelect('q.options', 'option')
-      .where('qs.id = :id', { id: dto.questionSetId })
+      .createQueryBuilder('questionSet')
+      .leftJoinAndSelect('questionSet.questions', 'question') // This automatically joins the relation via the join table
+      .leftJoinAndSelect('question.options', 'option')
+      .where('questionSet.id = :id', { id: dto.questionSetId })
       .getOne();
+
     if (!questionSet) {
       throw new NotFoundException('Question set not found');
     }
@@ -235,6 +237,25 @@ export class QuestionSetsService {
       success: true,
       message: 'Question Set retrieved successfully',
       data: questionSet,
+    };
+  }
+
+  async update(id: string, dto: UpdateQuestionSetDto) {
+    const query = this.questionSetRepository
+      .createQueryBuilder('questionSet')
+      .where('questionSet.id = :id', { id });
+    const questionSet = await query.getOne();
+    if (!questionSet) {
+      throw new NotFoundException('Question Set does not exist');
+    }
+    const updatedQuestionSet = await query
+      .update()
+      .set({ ...dto })
+      .execute();
+
+    return {
+      id: id,
+      data: updatedQuestionSet,
     };
   }
 

@@ -8,6 +8,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
 import { AddQuestionDto } from './dto/add-question-dto';
 import { CreateQuestionSetDto } from './dto/create-question-set.dto';
+import { UpdateQuestionSetDto } from './dto/update-question-set.dto';
 import { QuestionSetsService } from './question-sets.service';
 
 @Controller('question-sets')
@@ -76,6 +78,11 @@ export class QuestionSetsController {
   @Roles(Role.Admin, Role.Teacher)
   findOne(@Param('id') id: string) {
     return this.questionSetService.getById(id);
+  }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateQuestionSetDto) {
+    return this.questionSetService.update(id, dto);
   }
 
   @Delete(':id')
