@@ -92,6 +92,16 @@ export class QuestionSetsController {
     return this.questionSetService.update(id, dto);
   }
 
+  @Post('/publish/:id')
+  publish(@Param('id') id: string) {
+    return this.questionSetService.publish(id);
+  }
+
+  @Post('/draft/:id')
+  draft(@Param('id') id: string) {
+    return this.questionSetService.draft(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.questionSetService.delete(id);
