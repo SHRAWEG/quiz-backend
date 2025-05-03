@@ -263,21 +263,27 @@ export class QuestionSetsService {
   }
 
   async update(id: string, dto: UpdateQuestionSetDto) {
-    const query = this.questionSetRepository
-      .createQueryBuilder('questionSet')
-      .where('questionSet.id = :id', { id });
-    const questionSet = await query.getOne();
-    if (!questionSet) {
+    // 1. Check if the question set exists
+    const exists = await this.questionSetRepository
+      .createQueryBuilder('qs')
+      .where('qs.id = :id', { id })
+      .getExists();
+
+    if (!exists) {
       throw new NotFoundException('Question Set does not exist');
     }
-    const updatedQuestionSet = await query
-      .update()
+
+    // 2. Perform update
+    const result = await this.questionSetRepository
+      .createQueryBuilder()
+      .update(QuestionSet)
       .set({ ...dto })
+      .where('id = :id', { id })
       .execute();
 
     return {
-      id: id,
-      data: updatedQuestionSet,
+      id,
+      data: result,
     };
   }
 
