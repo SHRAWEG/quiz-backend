@@ -88,6 +88,7 @@ export class QuestionsService {
     page: number,
     limit: number,
     search?: string,
+    status?: string,
     subjectId?: string,
     subSubjectId?: string,
   ) {
@@ -109,6 +110,9 @@ export class QuestionsService {
       query.andWhere('question.question ILIKE :search', {
         search: `%${search}%`,
       });
+    }
+    if (Object.values(QuestionStatus).includes(status as QuestionStatus)) {
+      query.andWhere('question.status = :status', { status });
     }
     if (subjectId) {
       query.andWhere('question.subjectId = :subjectId', { subjectId });
@@ -138,7 +142,8 @@ export class QuestionsService {
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.subSubject', 'subSubject')
       .leftJoinAndSelect('question.options', 'options')
-      .orderBy('question.createdAt', 'DESC');
+      .orderBy('question.createdAt', 'DESC')
+      .where('question.status = :status', { status: QuestionStatus.APPROVED });
 
     if (search) {
       query.andWhere('question.question ILIKE :search', {

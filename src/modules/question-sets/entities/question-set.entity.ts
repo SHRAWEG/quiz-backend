@@ -46,6 +46,16 @@ export class QuestionSet {
   @JoinColumn({ name: 'created_by_id' })
   createdBy: Relation<User>;
 
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
+
+  @Column({
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+    onUpdate: 'CURRENT_TIMESTAMP',
+  })
+  updatedAt: Date;
+
   @Column()
   name: string;
   @ManyToMany(() => Question, (question: Question) => question.questionSets)

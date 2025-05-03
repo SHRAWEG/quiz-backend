@@ -186,14 +186,19 @@ export class QuestionSetsService {
     return updatedQuestionSet;
   }
 
-  async get(page: number, limit: number, search?: string) {
+  async get(
+    page: number,
+    limit: number,
+    search?: string,
+    status?: QuestionSetStatus,
+  ) {
     const skip = (page - 1) * limit;
 
     const query = this.questionSetRepository
       .createQueryBuilder('questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
-      .leftJoinAndSelect('question.options', 'option')
-      .orderBy('question.createdAt', 'DESC')
+      .leftJoinAndSelect('questionSet.category', 'category')
+      .orderBy('questionSet.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
 
@@ -201,6 +206,11 @@ export class QuestionSetsService {
       query.andWhere('questionSet.name ILIKE :search', {
         search: `%${search}%`,
       });
+    }
+    if (
+      Object.values(QuestionSetStatus).includes(status as QuestionSetStatus)
+    ) {
+      query.andWhere('questionSet.status = :status', { status });
     }
 
     const [data, totalItems] = await query.getManyAndCount();
@@ -219,8 +229,20 @@ export class QuestionSetsService {
   async getById(id: string) {
     const query = this.questionSetRepository
       .createQueryBuilder('questionSet')
+      .leftJoinAndSelect('questionSet.category', 'category')
       .leftJoinAndSelect('questionSet.questions', 'question')
+      .leftJoin('questionSet.createdBy', 'user')
+      .addSelect([
+        'user.id',
+        'user.firstName',
+        'user.middleName',
+        'user.lastName',
+        'user.email',
+      ])
       .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.subject', 'subject') // join but not select
+      .leftJoin('question.subSubject', 'subSubject') // join but not select
+      .addSelect(['subSubject.id', 'subSubject.name']) // project only needed fields
       .where('questionSet.id = :id', { id });
 
     const questionSet = await query.getOne();
@@ -259,11 +281,47 @@ export class QuestionSetsService {
     };
   }
 
+  async publish(id: string) {
+    const query = this.questionSetRepository
+      .createQueryBuilder('questionSet')
+      .where('questionSet.id = :id', { id });
+    const questionSet = await query.getOne();
+    if (!questionSet) {
+      throw new NotFoundException('Question Set does not exist');
+    }
+    const updatedQuestionSet = await query
+      .update()
+      .set({ status: QuestionSetStatus.PUBLISHED })
+      .execute();
+    return {
+      id: id,
+      data: updatedQuestionSet,
+    };
+  }
+
+  async draft(id: string) {
+    const query = this.questionSetRepository
+      .createQueryBuilder('questionSet')
+      .where('questionSet.id = :id', { id });
+    const questionSet = await query.getOne();
+    if (!questionSet) {
+      throw new NotFoundException('Question Set does not exist');
+    }
+    const updatedQuestionSet = await query
+      .update()
+      .set({ status: QuestionSetStatus.DRAFT })
+      .execute();
+    return {
+      id: id,
+      data: updatedQuestionSet,
+    };
+  }
+
   // DELETE QuestionSet by ID
-  async delete(id: number): Promise<void> {
+  async delete(id: string) {
     const questionSet = await this.questionSetRepository
-      .createQueryBuilder('set')
-      .where('set.id = :id', { id })
+      .createQueryBuilder('questionSet')
+      .where('questionSet.id = :id', { id })
       .getOne();
 
     if (!questionSet) {
@@ -276,5 +334,10 @@ export class QuestionSetsService {
       .from(QuestionSet)
       .where('id = :id', { id })
       .execute();
+    return {
+      success: true,
+      message: 'Question set deleted succesfully',
+      data: id,
+    };
   }
 }

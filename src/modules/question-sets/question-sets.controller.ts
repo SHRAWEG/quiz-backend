@@ -6,7 +6,6 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -20,6 +19,7 @@ import { RolesGuard } from '../auth/guards/role.gaurd';
 import { AddQuestionDto } from './dto/add-question-dto';
 import { CreateQuestionSetDto } from './dto/create-question-set.dto';
 import { UpdateQuestionSetDto } from './dto/update-question-set.dto';
+import { QuestionSetStatus } from './entities/question-set.entity';
 import { QuestionSetsService } from './question-sets.service';
 
 @Controller('question-sets')
@@ -62,16 +62,23 @@ export class QuestionSetsController {
     name: 'search',
     required: false,
     type: String,
-    description: 'Term to search for subjects',
+    description: 'Term to filter search Question Sets',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    description: 'Status filter to search Question Sets',
   })
   get(
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
-    @Query('search') search: string = '',
+    @Query('search') search: string,
+    @Query('status') status: QuestionSetStatus,
   ) {
     const pageNumber = parseInt(page, 10);
     const limitNumber = parseInt(limit, 10);
-    return this.questionSetService.get(pageNumber, limitNumber, search);
+    return this.questionSetService.get(pageNumber, limitNumber, search, status);
   }
 
   @Get(':id')
@@ -86,7 +93,7 @@ export class QuestionSetsController {
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id') id: string) {
     return this.questionSetService.delete(id);
   }
 }

@@ -62,7 +62,7 @@ export class Question {
     enum: QuestionStatus,
     default: QuestionStatus.PENDING,
   })
-  status: string;
+  status: QuestionStatus;
 
   @OneToMany(() => Option, (option) => option.question, {
     cascade: ['insert', 'update', 'remove'],

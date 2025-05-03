@@ -17,6 +17,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { QuestionStatus } from './entities/question.entity';
 import { QuestionsService } from './questions.service';
 
 @Controller('questions')
@@ -52,6 +53,12 @@ export class QuestionsController {
     description: 'Term to search for subjects',
   })
   @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    description: 'Statuss to filter subjects',
+  })
+  @ApiQuery({
     name: 'subjectId',
     required: false,
     type: String,
@@ -67,6 +74,7 @@ export class QuestionsController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
     @Query('search') search: string = '',
+    @Query('status') status: QuestionStatus,
     @Query('subjectId') subjectId?: string,
     @Query('subSubjectId') subSubjectId?: string,
   ) {
@@ -76,6 +84,7 @@ export class QuestionsController {
       pageNumber,
       limitNumber,
       search,
+      status,
       subjectId,
       subSubjectId,
     );
