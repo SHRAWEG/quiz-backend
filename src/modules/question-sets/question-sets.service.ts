@@ -288,16 +288,19 @@ export class QuestionSetsService {
   }
 
   async publish(id: string) {
-    const query = this.questionSetRepository
-      .createQueryBuilder('questionSet')
-      .where('questionSet.id = :id', { id });
-    const questionSet = await query.getOne();
-    if (!questionSet) {
+    const exists = await this.questionSetRepository
+      .createQueryBuilder('qs')
+      .where('qs.id = :id', { id })
+      .getExists();
+
+    if (!exists) {
       throw new NotFoundException('Question Set does not exist');
     }
-    const updatedQuestionSet = await query
-      .update()
+    const updatedQuestionSet = await this.questionSetRepository
+      .createQueryBuilder()
+      .update(QuestionSet)
       .set({ status: QuestionSetStatus.PUBLISHED })
+      .where('id = :id', { id })
       .execute();
     return {
       id: id,
@@ -306,16 +309,19 @@ export class QuestionSetsService {
   }
 
   async draft(id: string) {
-    const query = this.questionSetRepository
-      .createQueryBuilder('questionSet')
-      .where('questionSet.id = :id', { id });
-    const questionSet = await query.getOne();
-    if (!questionSet) {
+    const exists = await this.questionSetRepository
+      .createQueryBuilder('qs')
+      .where('qs.id = :id', { id })
+      .getExists();
+
+    if (!exists) {
       throw new NotFoundException('Question Set does not exist');
     }
-    const updatedQuestionSet = await query
-      .update()
+    const updatedQuestionSet = await this.questionSetRepository
+      .createQueryBuilder()
+      .update(QuestionSet)
       .set({ status: QuestionSetStatus.DRAFT })
+      .where('id = :id', { id })
       .execute();
     return {
       id: id,
