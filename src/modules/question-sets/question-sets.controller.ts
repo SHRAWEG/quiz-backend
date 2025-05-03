@@ -45,7 +45,7 @@ export class QuestionSetsController {
   }
 
   @Get()
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.Admin, Role.Student)
   @ApiQuery({
     name: 'page',
     required: false,
@@ -82,7 +82,7 @@ export class QuestionSetsController {
   }
 
   @Get(':id')
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.Admin, Role.Student)
   findOne(@Param('id') id: string) {
     return this.questionSetService.getById(id);
   }
