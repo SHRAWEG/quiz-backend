@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import {
-  ValidationError,
-  ValidationException,
-} from 'src/common/exceptions/validation.exception';
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Question } from '../questions/entities/question.entity';
+import { SubSubject } from '../sub-subjects/entities/sub-subject.entity';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { Subject } from './entities/subject.entity';
@@ -14,15 +16,13 @@ export class SubjectsService {
   constructor(
     @InjectRepository(Subject)
     private readonly subjectRepository: Repository<Subject>,
+    @InjectRepository(Question)
+    private readonly questionRepository: Repository<Question>,
+    @InjectRepository(SubSubject)
+    private readonly subSubjectRepository: Repository<SubSubject>,
   ) {}
-
   // CREATE
   async create(createSubjectDto: CreateSubjectDto) {
-    const validationErrors: ValidationError = {};
-
-    if (validationErrors && Object.keys(validationErrors).length > 0) {
-      throw new ValidationException(validationErrors);
-    }
     const queryBuilder = this.subjectRepository
       .createQueryBuilder()
       .insert()
@@ -127,12 +127,28 @@ export class SubjectsService {
 
   // DELETE
   async delete(id: string) {
-    const queryBuilder = this.subjectRepository
+    // 1. Check if any question uses this subject
+    const isUsedInQuestion = await this.questionRepository
+      .createQueryBuilder('q')
+      .where('q.subjectId = :id', { id }) // Or 'q.subject.id = :id' if using relation
+      .getExists(); // Efficient existence check
+
+    const isUsedInSubject = await this.subSubjectRepository
+      .createQueryBuilder('q')
+      .where('q.subjectId = :id', { id }) // Or 'q.subject.id = :id' if using relation
+      .getExists(); // Efficient existence check
+    if (isUsedInQuestion || isUsedInSubject) {
+      throw new BadRequestException(
+        'Subject cannot be deleted because it has associated sub-subjects or questions or both',
+      );
+    }
+
+    // 2. Proceed with deletion
+    const result = await this.subjectRepository
       .createQueryBuilder()
       .delete()
-      .where('id = :id', { id });
-
-    const result = await queryBuilder.execute();
+      .where('id = :id', { id })
+      .execute();
 
     if (result.affected === 0) {
       throw new NotFoundException('Subject not found');

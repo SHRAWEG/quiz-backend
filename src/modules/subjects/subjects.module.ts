@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Question } from '../questions/entities/question.entity';
+import { SubSubject } from '../sub-subjects/entities/sub-subject.entity';
 import { User } from '../users/entities/user.entity';
 import { UsersModule } from '../users/users.module';
 import { Subject } from './entities/subject.entity';
@@ -8,7 +10,7 @@ import { SubjectsService } from './subjects.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Subject, User]), // Register the User repository in this module (if it's the right place)
+    TypeOrmModule.forFeature([Subject, User, Question, SubSubject]), // Register the User repository in this module (if it's the right place)
     UsersModule,
   ],
   controllers: [SubjectsController],

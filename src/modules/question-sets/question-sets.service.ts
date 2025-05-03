@@ -26,7 +26,7 @@ export class QuestionSetsService {
     @Inject(REQUEST) private readonly request: Request,
   ) {}
 
-  async create(dto: CreateQuestionSetDto): Promise<QuestionSet> {
+  async create(dto: CreateQuestionSetDto) {
     const user = this.request.user;
 
     // Start a transaction for creating the QuestionSet and any related entries
@@ -69,7 +69,11 @@ export class QuestionSetsService {
         throw new NotFoundException('Created question set not found');
       }
 
-      return newQuestionSet;
+      return {
+        success: true,
+        message: 'Question set created sucessfully',
+        data: newQuestionSet,
+      };
     } catch (error) {
       // If any error occurs, rollback the transaction
       await queryRunner.rollbackTransaction();
@@ -183,7 +187,11 @@ export class QuestionSetsService {
       .where('qs.id = :id', { id: questionSetId })
       .getOne();
 
-    return updatedQuestionSet;
+    return {
+      success: true,
+      message: 'Question removed sucessfully',
+      data: updatedQuestionSet,
+    };
   }
 
   async get(
@@ -283,6 +291,7 @@ export class QuestionSetsService {
 
     return {
       id,
+      message: 'Question set updated sucessfuly',
       data: result,
     };
   }
@@ -303,7 +312,8 @@ export class QuestionSetsService {
       .where('id = :id', { id })
       .execute();
     return {
-      id: id,
+      success: true,
+      message: 'Question set published sucessfuly',
       data: updatedQuestionSet,
     };
   }
@@ -324,7 +334,8 @@ export class QuestionSetsService {
       .where('id = :id', { id })
       .execute();
     return {
-      id: id,
+      success: true,
+      message: 'Question set drafted sucessfuly',
       data: updatedQuestionSet,
     };
   }

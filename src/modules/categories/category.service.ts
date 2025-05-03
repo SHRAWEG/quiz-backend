@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   ValidationError,
   ValidationException,
 } from 'src/common/exceptions/validation.exception';
 import { Repository } from 'typeorm';
+import { Question } from '../questions/entities/question.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
@@ -14,6 +19,8 @@ export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(Question)
+    private readonly questionRepository: Repository<Question>,
   ) {}
 
   // CREATE
@@ -113,7 +120,7 @@ export class CategoriesService {
     const result = await queryBuilder.execute();
 
     if (result.affected === 0) {
-      throw new Error('Category not found');
+      throw new NotFoundException('Category not found');
     }
 
     const updatedCategory = await this.categoryRepository.findOneBy({ id });
@@ -127,12 +134,22 @@ export class CategoriesService {
 
   // DELETE
   async delete(id: string) {
-    const queryBuilder = this.categoryRepository
+    // 1. Check if any question uses this subject
+    const isUsedInQuestion = await this.questionRepository
+      .createQueryBuilder('q')
+      .where('q.subS = :id', { id }) // Or 'q.subject.id = :id' if using relation
+      .getExists(); // Efficient existence check
+    if (isUsedInQuestion) {
+      throw new BadRequestException(
+        'Cannot delete Category; it is used in some questions.',
+      );
+    }
+
+    const result = await this.categoryRepository
       .createQueryBuilder()
       .delete()
-      .where('id = :id', { id });
-
-    const result = await queryBuilder.execute();
+      .where('id = :id', { id })
+      .execute();
 
     if (result.affected === 0) {
       throw new NotFoundException('Category not found');
@@ -140,7 +157,7 @@ export class CategoriesService {
 
     return {
       success: true,
-      message: 'Category deleted successfully',
+      message: 'Sub-Subject deleted successfully',
       data: result,
     };
   }

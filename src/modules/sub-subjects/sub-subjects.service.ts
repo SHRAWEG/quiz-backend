@@ -1,13 +1,13 @@
 import {
-  forwardRef,
+  BadRequestException,
   HttpException,
   HttpStatus,
-  Inject,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QuestionsService } from '../questions/questions.service';
+import { Question } from '../questions/entities/question.entity';
 import { CreateSubSubjectDto } from './dto/create-sub-subject.dto';
 import { UpdateSubSubjectDto } from './dto/update-sub-subject.dto';
 import { SubSubject } from './entities/sub-subject.entity';
@@ -17,8 +17,8 @@ export class SubSubjectsService {
   constructor(
     @InjectRepository(SubSubject)
     private readonly subSubjectRepository: Repository<SubSubject>,
-    @Inject(forwardRef(() => QuestionsService)) // <-- wrap QuestionsService injection
-    private readonly questionsService: QuestionsService,
+    @InjectRepository(Question)
+    private readonly questionRepository: Repository<Question>,
   ) {}
 
   async create(createSubSubjectDto: CreateSubSubjectDto) {
@@ -138,16 +138,14 @@ export class SubSubjectsService {
   }
 
   async delete(id: string) {
-    const subSubject = await this.subSubjectRepository
-      .createQueryBuilder('subSubject')
-      .leftJoinAndSelect('subSubject.questions', 'questions')
-      .where('subSubject.id = :id', { id })
-      .getOne();
-
-    if (subSubject && subSubject.questions.length > 0) {
-      throw new HttpException(
-        'Sub Subject cannot be deleted because it has associated questions',
-        HttpStatus.BAD_REQUEST, // This is equivalent to HTTP status code 400
+    // 1. Check if any question uses this subject
+    const isUsedInQuestion = await this.questionRepository
+      .createQueryBuilder('q')
+      .where('q.subS = :id', { id }) // Or 'q.subject.id = :id' if using relation
+      .getExists(); // Efficient existence check
+    if (isUsedInQuestion) {
+      throw new BadRequestException(
+        'Cannot delete Sub-subject; it is used in some questions',
       );
     }
 
@@ -156,6 +154,10 @@ export class SubSubjectsService {
       .delete()
       .where('id = :id', { id })
       .execute();
+
+    if (result.affected === 0) {
+      throw new NotFoundException('Sub-subject not found');
+    }
 
     return {
       success: true,
