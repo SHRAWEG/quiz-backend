@@ -9,7 +9,7 @@ import {
   ValidationException,
 } from 'src/common/exceptions/validation.exception';
 import { Repository } from 'typeorm';
-import { Question } from '../questions/entities/question.entity';
+import { QuestionSet } from '../question-sets/entities/question-set.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
@@ -19,8 +19,8 @@ export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
-    @InjectRepository(Question)
-    private readonly questionRepository: Repository<Question>,
+    @InjectRepository(QuestionSet)
+    private readonly questionSetRepository: Repository<QuestionSet>,
   ) {}
 
   // CREATE
@@ -135,11 +135,11 @@ export class CategoriesService {
   // DELETE
   async delete(id: string) {
     // 1. Check if any question uses this subject
-    const isUsedInQuestion = await this.questionRepository
-      .createQueryBuilder('category')
-      .where('category.id = :id', { id }) // Or 'q.subject.id = :id' if using relation
+    const isUsedInQuestionSet = await this.questionSetRepository
+      .createQueryBuilder('questionSet')
+      .where('questionSet.categoryId = :id', { id }) // Or 'q.subject.id = :id' if using relation
       .getExists(); // Efficient existence check
-    if (isUsedInQuestion) {
+    if (isUsedInQuestionSet) {
       throw new BadRequestException(
         'Cannot delete Category; it is used in some questions.',
       );
