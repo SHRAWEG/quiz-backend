@@ -136,8 +136,8 @@ export class CategoriesService {
   async delete(id: string) {
     // 1. Check if any question uses this subject
     const isUsedInQuestion = await this.questionRepository
-      .createQueryBuilder('q')
-      .where('q.subS = :id', { id }) // Or 'q.subject.id = :id' if using relation
+      .createQueryBuilder('category')
+      .where('category.id = :id', { id }) // Or 'q.subject.id = :id' if using relation
       .getExists(); // Efficient existence check
     if (isUsedInQuestion) {
       throw new BadRequestException(
