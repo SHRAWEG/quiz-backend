@@ -12,16 +12,16 @@ import {
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
+import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
 import { CreateSubSubjectDto } from './dto/create-sub-subject.dto';
 import { UpdateSubSubjectDto } from './dto/update-sub-subject.dto';
 import { SubSubjectsService } from './sub-subjects.service';
-import { AuthGuard } from '../auth/guards/auth.guard';
 
 @Controller('sub-subjects')
 @UseGuards(AuthGuard, RolesGuard)
 @ApiBearerAuth()
-@Roles(Role.Admin)
+@Roles(Role.ADMIN)
 export class SubSubjectsController {
   constructor(private readonly subSubjectsService: SubSubjectsService) {}
 
@@ -72,7 +72,7 @@ export class SubSubjectsController {
   }
 
   @Get('search')
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.ADMIN, Role.TEACHER)
   @ApiQuery({
     name: 'search',
     required: false,

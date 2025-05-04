@@ -22,10 +22,10 @@ import { OptionsModule } from './modules/options/options.module';
 import { QuestionSet } from './modules/question-sets/entities/question-set.entity';
 import { QuestionSetsModule } from './modules/question-sets/question-sets.module';
 import { QuestionsModule } from './modules/questions/questions.module';
+import { QuizesModule } from './modules/quizes/quizes.module';
 import { SubSubjectsModule } from './modules/sub-subjects/sub-subjects.module';
 import { SubjectsModule } from './modules/subjects/subjects.module';
 import { UsersModule } from './modules/users/users.module';
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -61,6 +61,7 @@ import { UsersModule } from './modules/users/users.module';
     UsersModule,
     QuestionSetsModule,
     CategoriesModule,
+    QuizesModule,
   ],
   controllers: [],
   providers: [UsersService, EmailService],

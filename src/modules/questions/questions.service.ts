@@ -120,7 +120,7 @@ export class QuestionsService {
     if (subSubjectId) {
       query.andWhere('question.subSubjectId = :subSubjectId', { subSubjectId });
     }
-    if (user?.role !== Role.Admin) {
+    if (user?.role !== Role.ADMIN) {
       query.andWhere('question.createdById = :userId', { userId: user?.sub });
     }
 
@@ -177,7 +177,7 @@ export class QuestionsService {
       .leftJoinAndSelect('question.options', 'options')
       .where('question.id = :id', { id });
 
-    if (user?.role !== Role.Admin) {
+    if (user?.role !== Role.ADMIN) {
       query.andWhere('question.createdById = :userId', { userId: user?.sub });
     }
     const question = await query.getOne();
@@ -190,7 +190,7 @@ export class QuestionsService {
       };
     }
 
-    if (user?.role !== Role.Admin) {
+    if (user?.role !== Role.ADMIN) {
       if (question.createdById !== user?.sub) {
         return {
           success: false,

@@ -132,7 +132,7 @@ export class UsersService {
       lastName: 'User',
       email: 'admin@quizit.com',
       phone: '1234567890',
-      role: Role.Admin,
+      role: Role.ADMIN,
       password: await argon2.hash('admin123'), // Default password
       isEmailVerified: true,
       isActive: true,

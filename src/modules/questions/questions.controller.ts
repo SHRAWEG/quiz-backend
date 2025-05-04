@@ -22,18 +22,18 @@ import { QuestionsService } from './questions.service';
 
 @Controller('questions')
 @UseGuards(AuthGuard, RolesGuard)
-@Roles(Role.Admin)
+@Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class QuestionsController {
   constructor(private readonly questionService: QuestionsService) {}
   @Post()
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.ADMIN, Role.TEACHER)
   addQuestion(@Body() createQuestionDto: CreateQuestionDto) {
     return this.questionService.create(createQuestionDto);
   }
 
   @Get()
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.ADMIN, Role.TEACHER)
   @ApiQuery({
     name: 'page',
     required: false,
@@ -112,13 +112,13 @@ export class QuestionsController {
   }
 
   @Get(':id')
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.ADMIN, Role.TEACHER)
   findOne(@Param('id') id: string) {
     return this.questionService.getById(id);
   }
 
   @Put(':id')
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.ADMIN, Role.TEACHER)
   update(
     @Param('id') id: string,
     @Body() updateQuestionDto: UpdateQuestionDto,
@@ -139,7 +139,7 @@ export class QuestionsController {
   }
 
   @Delete(':id')
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.ADMIN, Role.TEACHER)
   delete(@Param('id') id: string) {
     return this.questionService.delete(id);
   }

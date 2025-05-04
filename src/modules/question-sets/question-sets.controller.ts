@@ -24,7 +24,7 @@ import { QuestionSetsService } from './question-sets.service';
 
 @Controller('question-sets')
 @UseGuards(AuthGuard, RolesGuard)
-@Roles(Role.Admin)
+@Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class QuestionSetsController {
   constructor(private readonly questionSetService: QuestionSetsService) {}
@@ -45,7 +45,7 @@ export class QuestionSetsController {
   }
 
   @Get()
-  @Roles(Role.Admin, Role.Student)
+  @Roles(Role.ADMIN, Role.STUDENT)
   @ApiQuery({
     name: 'page',
     required: false,
@@ -82,7 +82,7 @@ export class QuestionSetsController {
   }
 
   @Get(':id')
-  @Roles(Role.Admin, Role.Student)
+  @Roles(Role.ADMIN, Role.STUDENT)
   findOne(@Param('id') id: string) {
     return this.questionSetService.getById(id);
   }

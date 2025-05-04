@@ -20,7 +20,7 @@ import { SubjectsService } from './subjects.service';
 
 @Controller('subjects')
 @UseGuards(AuthGuard, RolesGuard)
-@Roles(Role.Admin)
+@Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class SubjectsController {
   constructor(private readonly subjectsService: SubjectsService) {}
@@ -60,7 +60,7 @@ export class SubjectsController {
   }
 
   @Get('search')
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.ADMIN, Role.TEACHER)
   @ApiQuery({
     name: 'search',
     required: false,

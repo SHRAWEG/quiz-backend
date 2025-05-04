@@ -9,6 +9,7 @@ import {
 import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
+import { Role } from 'src/common/enums/roles.enum';
 import { Repository } from 'typeorm';
 import { Question } from '../questions/entities/question.entity';
 import { AddQuestionDto } from './dto/add-question-dto';
@@ -200,7 +201,10 @@ export class QuestionSetsService {
     search?: string,
     status?: QuestionSetStatus,
   ) {
+    const user = this.request.user;
     const skip = (page - 1) * limit;
+    const actStatus =
+      user!.role == Role.STUDENT ? QuestionSetStatus.PUBLISHED : status;
 
     const query = this.questionSetRepository
       .createQueryBuilder('questionSet')
@@ -216,9 +220,9 @@ export class QuestionSetsService {
       });
     }
     if (
-      Object.values(QuestionSetStatus).includes(status as QuestionSetStatus)
+      Object.values(QuestionSetStatus).includes(actStatus as QuestionSetStatus)
     ) {
-      query.andWhere('questionSet.status = :status', { status });
+      query.andWhere('questionSet.status = :status', { actStatus });
     }
 
     const [data, totalItems] = await query.getManyAndCount();

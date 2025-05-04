@@ -20,7 +20,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Controller('categories')
 @UseGuards(AuthGuard, RolesGuard)
-@Roles(Role.Admin)
+@Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
@@ -60,7 +60,7 @@ export class CategoriesController {
   }
 
   @Get('search')
-  @Roles(Role.Admin, Role.Teacher)
+  @Roles(Role.ADMIN, Role.TEACHER)
   @ApiQuery({
     name: 'search',
     required: false,
