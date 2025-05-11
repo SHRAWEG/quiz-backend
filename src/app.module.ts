@@ -71,6 +71,8 @@ export class AppModule implements OnModuleInit {
   constructor(private readonly usersService: UsersService) {}
 
   async onModuleInit() {
-    await this.usersService.seedAdminUser();
+    await this.usersService.seedAdmin();
+    await this.usersService.seedTeacher();
+    await this.usersService.seedStudent();
   }
 }

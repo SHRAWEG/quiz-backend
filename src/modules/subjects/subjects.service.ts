@@ -87,6 +87,7 @@ export class SubjectsService {
   async findById(id: string) {
     const queryBuilder = this.subjectRepository
       .createQueryBuilder('subject')
+      .leftJoinAndSelect('subject.subSubjects', 'subSubjects')
       .where('subject.id = :id', { id });
 
     const subject = await queryBuilder.getOne();

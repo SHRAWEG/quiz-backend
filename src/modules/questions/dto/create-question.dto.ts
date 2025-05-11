@@ -15,11 +15,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { IsUnique } from 'src/common/decorators/is-unique.decorator';
+import { DifficultyLevel, QuestionType } from 'src/common/enums/question.enum';
 import { ForbidIfNotType } from 'src/common/validators/forbid-if-not-type.decorator';
-import { OnlyOneCorrectOption } from 'src/common/validators/only-one-correct-option.validator';
-import { UniqueOptionsText } from 'src/common/validators/unique-opyions-text.valitaros';
 import { CreateOptionDto } from 'src/modules/options/dto/create-option.dto';
-import { DifficultyLevel, QuestionType } from '../entities/question.entity';
 
 export class CreateQuestionDto {
   @ApiProperty({
@@ -46,11 +44,6 @@ export class CreateQuestionDto {
   @ArrayMaxSize(4)
   @ValidateNested({ each: true })
   @Type(() => CreateOptionDto)
-  @OnlyOneCorrectOption()
-  @UniqueOptionsText()
-  @ForbidIfNotType(QuestionType.MCQ, {
-    message: 'Options are only allowed for MCQ type',
-  })
   options?: CreateOptionDto[];
 
   // True/False (only for trueOrFalse)

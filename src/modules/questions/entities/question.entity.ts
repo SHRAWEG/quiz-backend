@@ -1,3 +1,8 @@
+import {
+  DifficultyLevel,
+  QuestionStatus,
+  QuestionType,
+} from 'src/common/enums/question.enum';
 import { Option } from 'src/modules/options/entities/option.entity';
 import { QuestionSet } from 'src/modules/question-sets/entities/question-set.entity';
 import { SubSubject } from 'src/modules/sub-subjects/entities/sub-subject.entity';
@@ -13,29 +18,6 @@ import {
   PrimaryGeneratedColumn,
   Relation,
 } from 'typeorm';
-
-export enum QuestionType {
-  LONG = 'long',
-  SHORT = 'short',
-  MCQ = 'mcq',
-  TRUE_OR_FALSE = 'true-or-false',
-  FILL_IN_THE_BLANKS = 'fill-in-the-blanks',
-}
-
-export enum DifficultyLevel {
-  LEVEL1 = 1,
-  LEVEL2 = 2,
-  LEVEL3 = 3,
-  LEVEL4 = 4,
-  LEVEL5 = 5,
-}
-
-export enum QuestionStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  DRAFT = 'draft',
-}
 
 @Entity('questions')
 export class Question {

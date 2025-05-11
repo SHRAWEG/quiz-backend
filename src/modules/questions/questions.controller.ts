@@ -17,8 +17,8 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
-import { QuestionStatus } from './entities/question.entity';
 import { QuestionsService } from './questions.service';
+import { QuestionStatus } from 'src/common/enums/question.enum';
 
 @Controller('questions')
 @UseGuards(AuthGuard, RolesGuard)

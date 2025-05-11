@@ -119,7 +119,7 @@ export class UsersService {
     });
   }
 
-  async seedAdminUser(): Promise<void> {
+  async seedAdmin(): Promise<void> {
     const existingAdmin = await this.userRepo.findOneBy({
       email: 'admin@quizit.com',
     });
@@ -127,7 +127,7 @@ export class UsersService {
       return; // Admin user already exists
     }
 
-    const adminUser = this.userRepo.create({
+    const admin = this.userRepo.create({
       firstName: 'Admin',
       lastName: 'User',
       email: 'admin@quizit.com',
@@ -138,7 +138,51 @@ export class UsersService {
       isActive: true,
     });
 
-    await this.userRepo.save(adminUser);
+    await this.userRepo.save(admin);
+  }
+
+  async seedTeacher(): Promise<void> {
+    const existingTeacher = await this.userRepo.findOneBy({
+      email: 'teacher@quizit.com',
+    });
+    if (existingTeacher) {
+      return; // Admin user already exists
+    }
+
+    const teacher = this.userRepo.create({
+      firstName: 'Teacher',
+      lastName: 'User',
+      email: 'teacher@quizit.com',
+      phone: '1234567890',
+      role: Role.TEACHER,
+      password: await argon2.hash('admin123'), // Default password
+      isEmailVerified: true,
+      isActive: true,
+    });
+
+    await this.userRepo.save(teacher);
+  }
+
+  async seedStudent(): Promise<void> {
+    const existingStudent = await this.userRepo.findOneBy({
+      email: 'student@quizit.com',
+    });
+    if (existingStudent) {
+      return; // Student user already exists
+    }
+
+    const teacher = this.userRepo.create({
+      firstName: 'Student',
+      lastName: 'User',
+      email: 'student@quizit.com',
+      phone: '1234567890',
+      role: Role.STUDENT,
+      password: await argon2.hash('admin123'), // Default password
+      isEmailVerified: true,
+      isActive: true,
+    });
+
+    await this.userRepo.save(teacher);
   }
 
   /**

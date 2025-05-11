@@ -20,7 +20,7 @@ export class SubSubject {
   @Column()
   subjectId: string;
 
-  @ManyToOne(() => Subject, (subject) => subject.subSubject)
+  @ManyToOne(() => Subject, (subject) => subject.subSubjects)
   @JoinColumn({ name: 'subject_id' })
   subject: Subject;
 

@@ -11,7 +11,7 @@ export class Subject {
   name: string;
 
   @OneToMany(() => SubSubject, (subSubject) => subSubject.subject)
-  subSubject: SubSubject[];
+  subSubjects: SubSubject[];
 
   @OneToMany(() => Question, (question) => question.subject)
   question: Question[];
