@@ -70,6 +70,7 @@ export class QuestionSetsController {
     type: String,
     description: 'Status filter to search Question Sets',
   })
+  @Roles(Role.ADMIN, Role.STUDENT)
   get(
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',

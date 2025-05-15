@@ -40,6 +40,9 @@ export class QuestionSet {
   @JoinColumn({ name: 'category_id' })
   category: Relation<Category>;
 
+  @Column({ type: 'integer', nullable: true }) // time in seconds
+  timeLimitSeconds?: number;
+
   @ManyToOne(() => User, {
     onDelete: 'CASCADE',
   })

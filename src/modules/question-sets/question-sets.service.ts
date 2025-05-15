@@ -222,7 +222,7 @@ export class QuestionSetsService {
     if (
       Object.values(QuestionSetStatus).includes(actStatus as QuestionSetStatus)
     ) {
-      query.andWhere('questionSet.status = :status', { actStatus });
+      query.andWhere('questionSet.status = :status', { status: actStatus });
     }
 
     const [data, totalItems] = await query.getManyAndCount();

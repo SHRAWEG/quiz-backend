@@ -19,6 +19,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CategoriesModule } from './modules/categories/category.module';
 import { Category } from './modules/categories/entities/category.entity';
 import { OptionsModule } from './modules/options/options.module';
+import { QuestionAttemptModule } from './modules/question-attempt/question-attempt.module';
+import { QuestionSetAttemptModule } from './modules/question-set-attempt/question-set-attempt.module';
 import { QuestionSet } from './modules/question-sets/entities/question-set.entity';
 import { QuestionSetsModule } from './modules/question-sets/question-sets.module';
 import { QuestionsModule } from './modules/questions/questions.module';
@@ -26,6 +28,7 @@ import { QuizesModule } from './modules/quizes/quizes.module';
 import { SubSubjectsModule } from './modules/sub-subjects/sub-subjects.module';
 import { SubjectsModule } from './modules/subjects/subjects.module';
 import { UsersModule } from './modules/users/users.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -62,6 +65,8 @@ import { UsersModule } from './modules/users/users.module';
     QuestionSetsModule,
     CategoriesModule,
     QuizesModule,
+    QuestionSetAttemptModule,
+    QuestionAttemptModule,
   ],
   controllers: [],
   providers: [UsersService, EmailService],
