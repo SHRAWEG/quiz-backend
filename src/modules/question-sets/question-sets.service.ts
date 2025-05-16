@@ -274,6 +274,92 @@ export class QuestionSetsService {
     };
   }
 
+  async getQuestionSetsToAttempt(
+    page: number,
+    limit: number,
+    search?: string,
+    categoryId?: string,
+  ) {
+    const skip = (page - 1) * limit;
+    console.log('QUETION SETS TO ATTEPT');
+    const query = this.questionSetRepository
+      .createQueryBuilder('questionSet')
+      .loadRelationCountAndMap(
+        'questionSet.questionsCount',
+        'questionSet.questions',
+      )
+      .leftJoinAndSelect('questionSet.category', 'category')
+      .where('questionSet.status = :status', {
+        status: QuestionSetStatus.PUBLISHED,
+      })
+      .orderBy('questionSet.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    if (search) {
+      query.andWhere('questionSet.name ILIKE :search', {
+        search: `%${search}%`,
+      });
+    }
+    if (categoryId) {
+      query.andWhere('questionSet.categoryId = :categoryId', {
+        categoryId: categoryId,
+      });
+    }
+
+    const [data, totalItems] = await query.getManyAndCount();
+
+    return {
+      success: true,
+      message: 'Question Sets for Quiz/Test retrieved successfully',
+      data,
+      totalItems,
+      totalPages: Math.ceil(totalItems / limit),
+      currentPage: page,
+      pageSize: limit,
+    };
+  }
+
+  async getQuestionSetToAttempt(id: string) {
+    const query = this.questionSetRepository
+      .createQueryBuilder('questionSet')
+      .leftJoinAndSelect('questionSet.category', 'category')
+      .leftJoinAndSelect('questionSet.questions', 'question')
+      .leftJoin('questionSet.createdBy', 'user')
+      .addSelect([
+        'user.id',
+        'user.firstName',
+        'user.middleName',
+        'user.lastName',
+        'user.email',
+      ])
+      .leftJoin('question.options', 'option')
+      .addSelect(['option.id', 'option.option'])
+      .leftJoinAndSelect('question.subject', 'subject') // join but not select
+      .leftJoin('question.subSubject', 'subSubject') // join but not select
+      .addSelect(['subSubject.id', 'subSubject.name']) // project only needed fields
+      .where('questionSet.id = :id', { id })
+      .andWhere('questionSet.status = :status', {
+        status: QuestionSetStatus.PUBLISHED,
+      });
+
+    const questionSet = await query.getOne();
+
+    if (!questionSet) {
+      return {
+        success: false,
+        message: 'Question not found',
+        data: null,
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Question Set retrieved successfully',
+      data: questionSet,
+    };
+  }
+
   async update(id: string, dto: UpdateQuestionSetDto) {
     // 1. Check if the question set exists
     const exists = await this.questionSetRepository

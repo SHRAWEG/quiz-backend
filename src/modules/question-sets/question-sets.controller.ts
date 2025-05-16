@@ -45,7 +45,6 @@ export class QuestionSetsController {
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.STUDENT)
   @ApiQuery({
     name: 'page',
     required: false,
@@ -70,7 +69,6 @@ export class QuestionSetsController {
     type: String,
     description: 'Status filter to search Question Sets',
   })
-  @Roles(Role.ADMIN, Role.STUDENT)
   get(
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
@@ -82,10 +80,58 @@ export class QuestionSetsController {
     return this.questionSetService.get(pageNumber, limitNumber, search, status);
   }
 
-  @Get(':id')
-  @Roles(Role.ADMIN, Role.STUDENT)
+  @Get('/question-sets-to-attempt')
+  @Roles(Role.STUDENT)
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (default: 10)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Term to filter search Question Sets',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    type: String,
+    description: 'Category ID to filter Question Sets',
+  })
+  getQuestionSetsToAttempt(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search: string,
+    @Query('categoryId') categoryId: string,
+  ) {
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    return this.questionSetService.getQuestionSetsToAttempt(
+      pageNumber,
+      limitNumber,
+      search,
+      categoryId,
+    );
+  }
+
+  @Get('/:id')
   findOne(@Param('id') id: string) {
     return this.questionSetService.getById(id);
+  }
+
+  @Get('/question-sets-to-attempt/:id')
+  @Roles(Role.STUDENT)
+  getQuestionSetToAttempt(@Param('id') id: string) {
+    console.log('running /question-sets-to-attempt/:id ');
+    return this.questionSetService.getQuestionSetToAttempt(id);
   }
 
   @Put(':id')
