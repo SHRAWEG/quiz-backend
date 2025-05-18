@@ -88,26 +88,20 @@ export class QuestionSetAttemptService {
   async getQuestionSetAttempt(questionSetAttemptId: string) {
     const user = this.request.user;
     const questionSetAttempt = await this.questionSetAttemptsRepository
-      .createQueryBuilder('attempt')
-      .leftJoinAndSelect('attempt.questionSet', 'questionSet')
-      .leftJoin('questionSet.questions', 'question') // don't auto-select question
-      .leftJoin('question.options', 'option') // don't auto-select option
-      .leftJoin('question.subject', 'subject') // don't auto-select option
-      .leftJoin('question.subSubject', 'subSubject') // don't auto-select option
-      .addSelect([
-        'question.id',
-        'question.question',
-        'question.type',
-        'question.difficulty',
-        'option.id',
-        'option.option',
-        'subject.id',
-        'subject.name',
-        'subSubject.id',
-        'subSubject.name',
-      ])
-      .where('attempt.id = :id', { id: questionSetAttemptId })
-      .andWhere('attempt.userId = :userId', { userId: user?.sub })
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.category', 'category') // don't auto-select question
+      .leftJoinAndSelect('questionSet.questions', 'question') // don't auto-select question
+      .leftJoinAndSelect('question.options', 'option') // don't auto-select option
+      .leftJoinAndSelect('question.subject', 'subject') // don't auto-select option
+      .leftJoinAndSelect('question.subSubject', 'subSubject') // don't auto-select option
+      .leftJoinAndSelect(
+        'question.questionAttempts', // assuming the relation is `question.attempts`
+        'questionAttempt',
+        'questionAttempt.questionSetAttemptId = questionSetAttempt.id',
+      )
+      .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
+      .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
       .getOne();
 
     if (!questionSetAttempt) {
@@ -127,7 +121,6 @@ export class QuestionSetAttemptService {
 
   async answerQuestion(
     questionSetAttemptId: string,
-    questionId: string,
     payload: AnswerQuestionDto,
   ) {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -169,7 +162,7 @@ export class QuestionSetAttemptService {
         .createQueryBuilder('question')
         .leftJoinAndSelect('question.options', 'option')
         .leftJoin('question.questionSets', 'questionSet')
-        .where('question.id = :questionId', { questionId })
+        .where('question.id = :questionId', { questionId: payload.questionId })
         .andWhere('questionSet.id = :questionSetId', {
           questionSetId: questionSetAttempt.questionSet.id,
         })
@@ -227,7 +220,9 @@ export class QuestionSetAttemptService {
         .where('questionSetAttempt.id = :questionSetAttemptId', {
           questionSetAttemptId,
         })
-        .andWhere('question.id = :questionId', { questionId })
+        .andWhere('question.id = :questionId', {
+          questionId: payload.questionId,
+        })
         .getOne();
 
       // Update question stats before creating questionAttempt
@@ -235,7 +230,7 @@ export class QuestionSetAttemptService {
         .getRepository(QuestionStats)
         .createQueryBuilder('questionStats')
         .leftJoinAndSelect('questionStats.question', 'question')
-        .where('question.id = :questionId', { questionId: question.id })
+        .where('question.id = :questionId', { questionId: payload.questionId })
         .getOne();
       if (!questionStats) {
         // Create new stats entry

@@ -25,7 +25,7 @@ export class QuestionSetAttemptController {
   ) {}
 
   // Start a new quiz attempt
-  @Post('/start/:questionSetId/start')
+  @Post('/start/:questionSetId')
   async startQuestionSetAttempt(@Param('questionSetId') questionSetId: string) {
     return await this.questionSetAttemptService.startQuestionSetAttempt(
       questionSetId,
@@ -49,15 +49,13 @@ export class QuestionSetAttemptController {
   }
 
   // Submit an answer (could be in QuestionAttemptsController ideally)
-  @Post('/answer/:questionSetAttemptId/:questionId')
+  @Post('/answer/:questionSetAttemptId')
   async answerQuestion(
     @Param('questionSetAttemptId') questionSetAttemptId: string,
-    @Param('questionId') questionId: string,
     @Body() body: AnswerQuestionDto,
   ) {
     return await this.questionSetAttemptService.answerQuestion(
       questionSetAttemptId,
-      questionId,
       body,
     );
   }

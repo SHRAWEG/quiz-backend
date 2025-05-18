@@ -4,6 +4,7 @@ import {
   QuestionType,
 } from 'src/common/enums/question.enum';
 import { Option } from 'src/modules/options/entities/option.entity';
+import { QuestionAttempt } from 'src/modules/question-attempt/entities/question-attempt.entity';
 import { QuestionSet } from 'src/modules/question-sets/entities/question-set.entity';
 import { SubSubject } from 'src/modules/sub-subjects/entities/sub-subject.entity';
 import { Subject } from 'src/modules/subjects/entities/subject.entity';
@@ -46,11 +47,6 @@ export class Question {
   })
   status: QuestionStatus;
 
-  @OneToMany(() => Option, (option) => option.question, {
-    cascade: ['insert', 'update', 'remove'],
-  })
-  options?: Option[];
-
   @Column({ type: 'boolean', nullable: true })
   correctAnswerBoolean?: boolean;
 
@@ -72,6 +68,14 @@ export class Question {
     onUpdate: 'CURRENT_TIMESTAMP',
   })
   updatedAt: Date;
+
+  @OneToMany(() => Option, (option) => option.question, {
+    cascade: ['insert', 'update', 'remove'],
+  })
+  options?: Option[];
+
+  @OneToMany(() => QuestionAttempt, (attempt) => attempt.question)
+  questionAttempts: QuestionAttempt[];
 
   @ManyToOne(() => Subject, {
     cascade: ['insert', 'update', 'remove'],

@@ -14,20 +14,6 @@ export class QuestionAttempt {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(
-    () => QuestionSetAttempt,
-    (questionSetAttempt) => questionSetAttempt.questionAttempts,
-  )
-  @JoinColumn({ name: 'questionSetAttemptId' })
-  questionSetAttempt: Relation<QuestionSetAttempt>;
-
-  @Column({ type: 'uuid' })
-  questionId: string;
-
-  @ManyToOne(() => Question)
-  @JoinColumn({ name: 'question_id' })
-  question: Relation<Question>;
-
   @Column({ type: 'text', nullable: true })
   selectedTextAnswer?: string;
 
@@ -39,4 +25,19 @@ export class QuestionAttempt {
 
   @Column({ default: false })
   isCorrect: boolean;
+
+  @Column()
+  questionSetAttemptId: string;
+  @ManyToOne(
+    () => QuestionSetAttempt,
+    (questionSetAttempt) => questionSetAttempt.questionAttempts,
+  )
+  @JoinColumn({ name: 'question_set_attempt_id' })
+  questionSetAttempt: Relation<QuestionSetAttempt>;
+
+  @Column({ type: 'uuid' })
+  questionId: string;
+  @ManyToOne(() => Question)
+  @JoinColumn({ name: 'question_id' })
+  question: Relation<Question>;
 }
