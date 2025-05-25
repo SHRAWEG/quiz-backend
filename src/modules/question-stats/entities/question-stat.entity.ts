@@ -13,6 +13,9 @@ export class QuestionStats {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column()
+  questionId: string;
+
   @OneToOne(() => Question)
   @JoinColumn({ name: 'question_id' })
   question: Relation<Question>;

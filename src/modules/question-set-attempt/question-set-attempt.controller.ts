@@ -48,6 +48,16 @@ export class QuestionSetAttemptController {
     );
   }
 
+  // Get Question set Attempt Reports if completed.
+  @Get('/report/:questionSetAttemptId')
+  async getQuestionSetAttemptReport(
+    @Param('questionSetAttemptId') questionSetAttemptId: string,
+  ) {
+    return await this.questionSetAttemptService.getQuestionSetAttemptReport(
+      questionSetAttemptId,
+    );
+  }
+
   // Submit an answer (could be in QuestionAttemptsController ideally)
   @Post('/answer/:questionSetAttemptId')
   async answerQuestion(

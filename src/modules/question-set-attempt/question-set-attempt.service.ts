@@ -35,38 +35,118 @@ export class QuestionSetAttemptService {
 
   async startQuestionSetAttempt(questionSetId: string) {
     const user = this.request.user;
-    const questionSet = await this.questionSetRepository
-      .createQueryBuilder('questionSet')
-      .where('questionSet.id = :questionSetId', {
-        questionSetId: questionSetId,
-      })
-      .getOne();
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const questionSetRepo = queryRunner.manager.getRepository(QuestionSet);
+      const questionSetAttemptRepo =
+        queryRunner.manager.getRepository(QuestionSetAttempt);
+      const questionAttemptRepo =
+        queryRunner.manager.getRepository(QuestionAttempt);
+      const questionStatRepo = queryRunner.manager.getRepository(QuestionStats);
 
-    if (!questionSet) {
-      throw new NotFoundException({
-        success: false,
-        message: 'Question Set nof found to start quiz.',
-        data: null,
-      });
-    }
+      const questionSet = await questionSetRepo
+        .createQueryBuilder('questionSet')
+        .leftJoinAndSelect('questionSet.questions', 'question')
+        .where('questionSet.id = :questionSetId', {
+          questionSetId: questionSetId,
+        })
+        .getOne();
 
-    const questionSetAttemptPayload = this.questionSetAttemptsRepository.create(
-      {
+      if (!questionSet) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Question Set nof found to start quiz.',
+          data: null,
+        });
+      }
+      const questionSetAttemptPayload = questionSetAttemptRepo.create({
         userId: user?.sub,
         questionSet: { id: questionSet.id },
         isCompleted: false,
         startedAt: new Date(),
-      },
-    );
-    const questionSetAttempt = await this.questionSetAttemptsRepository.save(
-      questionSetAttemptPayload,
-    );
+      });
+      const questionSetAttempt = await questionSetAttemptRepo.save(
+        questionSetAttemptPayload,
+      );
 
-    return {
-      success: true,
-      message: 'Quiz started, Best of luck student.',
-      data: questionSetAttempt,
-    };
+      // Create Question Attempts on Question Set Attempt
+      const questions = questionSet.questions;
+      for (const question of questions) {
+        const questionAttemptPayload = questionAttemptRepo.create({
+          questionSetAttemptId: questionSetAttempt.id,
+          questionId: question.id,
+          isCorrect: false,
+        });
+        await questionAttemptRepo.save(questionAttemptPayload);
+
+        let questionStat = await questionStatRepo
+          .createQueryBuilder('questionStats')
+          .leftJoinAndSelect('questionStats.question', 'question')
+          .where('question.id = :questionId', { questionId: question.id })
+          .getOne();
+
+        if (!questionStat) {
+          questionStat = queryRunner.manager
+            .getRepository(QuestionStats)
+            .create({
+              questionId: question.id,
+              timesUsed: 1,
+              timesAnsweredCorrectly: 0,
+            });
+        } else {
+          questionStat.timesUsed += 1;
+        }
+        await questionStatRepo.save(questionStat);
+      }
+      await queryRunner.commitTransaction();
+      return {
+        success: true,
+        message: 'Quiz started, Best of luck student.',
+        data: questionSetAttempt,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to submit answer.';
+      throw new BadRequestException({
+        success: false,
+        message: errorMessage,
+        data: null,
+      });
+    } finally {
+      await queryRunner.release();
+    }
+    // const questionSet = await this.questionSetRepository
+    //   .createQueryBuilder('questionSet')
+    //   .where('questionSet.id = :questionSetId', {
+    //     questionSetId: questionSetId,
+    //   })
+    //   .getOne();
+    // if (!questionSet) {
+    //   throw new NotFoundException({
+    //     success: false,
+    //     message: 'Question Set nof found to start quiz.',
+    //     data: null,
+    //   });
+    // }
+    // const questionSetAttemptPayload = this.questionSetAttemptsRepository.create(
+    //   {
+    //     userId: user?.sub,
+    //     questionSet: { id: questionSet.id },
+    //     isCompleted: false,
+    //     startedAt: new Date(),
+    //   },
+    // );
+    // const questionSetAttempt = await this.questionSetAttemptsRepository.save(
+    //   questionSetAttemptPayload,
+    // );
+    // return {
+    //   success: true,
+    //   message: 'Quiz started, Best of luck student.',
+    //   data: questionSetAttempt,
+    // };
   }
 
   async getQuestionSetAttempts() {
@@ -87,21 +167,21 @@ export class QuestionSetAttemptService {
 
   async getQuestionSetAttempt(questionSetAttemptId: string) {
     const user = this.request.user;
+
     const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
-      .leftJoinAndSelect('questionSet.category', 'category') // don't auto-select question
-      .leftJoinAndSelect('questionSet.questions', 'question') // don't auto-select question
-      .leftJoinAndSelect('question.options', 'option') // don't auto-select option
-      .leftJoinAndSelect('question.subject', 'subject') // don't auto-select option
-      .leftJoinAndSelect('question.subSubject', 'subSubject') // don't auto-select option
       .leftJoinAndSelect(
-        'question.questionAttempts', // assuming the relation is `question.attempts`
+        'questionSetAttempt.questionAttempts',
         'questionAttempt',
-        'questionAttempt.questionSetAttemptId = questionSetAttempt.id',
       )
+      .leftJoinAndSelect('questionAttempt.question', 'question')
+      .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.subSubject', 'subSubject')
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
       .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      .orderBy('questionAttempt.createdAt', 'ASC')
       .getOne();
 
     if (!questionSetAttempt) {
@@ -112,10 +192,183 @@ export class QuestionSetAttemptService {
       });
     }
 
+    const formattedAttempts = questionSetAttempt.questionAttempts.map(
+      (attempt) => ({
+        id: attempt.id,
+        selectedAnswer:
+          attempt.selectedOptionId ??
+          attempt.selectedBooleanAnswer ??
+          attempt.selectedTextAnswer ??
+          null,
+        question: {
+          id: attempt.question.id,
+          question: attempt.question.question,
+          type: attempt.question.type,
+          difficulty: attempt.question.difficulty,
+          subject: {
+            id: attempt.question.subject?.id,
+            name: attempt.question.subject?.name,
+          },
+          subSubject: {
+            id: attempt.question.subSubject?.id,
+            name: attempt.question.subSubject?.name,
+          },
+          options: attempt.question.options?.map((opt) => ({
+            id: opt.id,
+            option: opt.option,
+          })),
+        },
+      }),
+    );
+
+    const attemptedQuestionsCount = questionSetAttempt.questionAttempts.filter(
+      (a) =>
+        (a.selectedOptionId !== null && a.selectedOptionId !== undefined) ||
+        (a.selectedBooleanAnswer !== null &&
+          a.selectedBooleanAnswer !== undefined) ||
+        (a.selectedTextAnswer && a.selectedTextAnswer.trim() !== ''),
+    ).length;
+
+    const formatted = {
+      id: questionSetAttempt.id,
+      questionSetId: questionSetAttempt.questionSet.id,
+      startedAt: questionSetAttempt.startedAt,
+      completedAt: questionSetAttempt.completedAt,
+      isCompleted: questionSetAttempt.isCompleted,
+      questionSetName: questionSetAttempt.questionSet.name,
+      questionSetCategory: questionSetAttempt.questionSet.category,
+      questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
+      attemptedQuestionsCount,
+      questionAttepts: formattedAttempts,
+    };
+
     return {
       success: true,
       message: 'Question set fetch successful.',
-      data: questionSetAttempt,
+      data: formatted,
+    };
+  }
+
+  async getQuestionSetAttemptReport(questionSetAttemptId: string) {
+    const user = this.request.user;
+
+    const questionSetAttempt = await this.questionSetAttemptsRepository
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect(
+        'questionSetAttempt.questionAttempts',
+        'questionAttempt',
+      )
+      .leftJoinAndSelect('questionAttempt.question', 'question')
+      .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.subSubject', 'subSubject')
+      .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
+      .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      // .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+      //   isCompleted: true,
+      // })
+      .orderBy('questionAttempt.createdAt', 'ASC')
+      .getOne();
+
+    if (!questionSetAttempt) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Question Set attempt not found.',
+        data: null,
+      });
+    }
+    if (!questionSetAttempt.isCompleted) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Question Set attempt is not completed yet.',
+        data: null,
+      });
+    }
+
+    const questionAttempts = questionSetAttempt.questionAttempts.map(
+      (attempt) => {
+        const { question } = attempt;
+
+        const selectedAnswer =
+          attempt.selectedOptionId ??
+          attempt.selectedBooleanAnswer ??
+          attempt.selectedTextAnswer ??
+          null;
+
+        // We use stored `isCorrect` and pull correct answer from question
+        let correctAnswer: string | boolean | null = null;
+
+        switch (question.type) {
+          case QuestionType.MCQ:
+            correctAnswer =
+              question.options?.find((opt) => opt.isCorrect)?.id ?? null;
+            break;
+          case QuestionType.TRUE_OR_FALSE:
+            correctAnswer =
+              typeof question.correctAnswerBoolean == 'boolean'
+                ? question.correctAnswerBoolean
+                : null;
+            break;
+          case QuestionType.FILL_IN_THE_BLANKS:
+            correctAnswer =
+              typeof question.correctAnswerText == 'string'
+                ? question.correctAnswerText
+                : null;
+            break;
+        }
+
+        return {
+          id: attempt.id,
+          selectedAnswer,
+          isCorrect: attempt.isCorrect,
+          question: {
+            id: question.id,
+            question: question.question,
+            type: question.type,
+            difficulty: question.difficulty,
+            subject: {
+              id: question.subject?.id,
+              name: question.subject?.name,
+            },
+            subSubject: {
+              id: question.subSubject?.id,
+              name: question.subSubject?.name,
+            },
+            options: question.options?.map((opt) => ({
+              id: opt.id,
+              option: opt.option,
+              isCorrect: opt.isCorrect,
+            })),
+            correctAnswer,
+          },
+        };
+      },
+    );
+
+    const attemptedQuestionsCount = questionAttempts.filter(
+      (a) => a.selectedAnswer !== null,
+    ).length;
+
+    const report = {
+      id: questionSetAttempt.id,
+      questionSetId: questionSetAttempt.questionSet.id,
+      startedAt: questionSetAttempt.startedAt,
+      completedAt: questionSetAttempt.completedAt,
+      isCompleted: questionSetAttempt.isCompleted,
+      score: questionSetAttempt.score,
+      percentage: questionSetAttempt.percentage,
+      questionSetName: questionSetAttempt.questionSet.name,
+      questionSetCategory: questionSetAttempt.questionSet.category,
+      questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
+      attemptedQuestionsCount,
+      questionAttempts,
+    };
+
+    return {
+      success: true,
+      message: 'Question set report generated successfully.',
+      data: report,
     };
   }
 
@@ -301,110 +554,6 @@ export class QuestionSetAttemptService {
       await queryRunner.release();
     }
   }
-  // async answerQuestion(
-  //   questionSetAttemptId: string,
-  //   questionId: string,
-  //   payload: AnswerQuestionDto,
-  // ) {
-  //   const queryRunner = this.dataSource.createQueryRunner();
-  //   await queryRunner.connect();
-  //   await queryRunner.startTransaction();
-  //   const questionSetAttempt = await this.questionSetAttemptsRepository
-  //     .createQueryBuilder('questionSetAttempt')
-  //     .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
-  //     .where('questionSetAttempt.id = :questionSetAttemptId', {
-  //       questionSetAttemptId: questionSetAttemptId,
-  //     })
-  //     .getOne();
-
-  //   if (!questionSetAttempt || questionSetAttempt.isCompleted) {
-  //     throw new BadRequestException({
-  //       success: false,
-  //       message: 'Quiz not found or already completed.',
-  //       data: null,
-  //     });
-  //   }
-
-  //   const timeLimit = questionSetAttempt.questionSet.timeLimitSeconds;
-  //   const now = new Date().getTime();
-  //   const started = new Date(questionSetAttempt.startedAt).getTime();
-  //   if (timeLimit && now - started > timeLimit * 1000) {
-  //     throw new BadRequestException({
-  //       success: false,
-  //       message: 'Time for the quiz is over.',
-  //       data: null,
-  //     });
-  //   }
-
-  //   const question = await this.questionRepository
-  //     .createQueryBuilder('question')
-  //     .leftJoinAndSelect('question.options', 'option')
-  //     .leftJoin('question.questionSets', 'questionSet')
-  //     .where('question.id = :questionId', { questionId })
-  //     .andWhere('questionSet.id = :questionSetId', {
-  //       questionSetId: questionSetAttempt.questionSet.id,
-  //     })
-  //     .getOne();
-  //   console.log(question);
-  //   if (!question) {
-  //     throw new BadRequestException({
-  //       success: false,
-  //       message:
-  //         'Question does not qxists or doesnot belongs to the current question set.',
-  //       data: null,
-  //     });
-  //   }
-
-  //   let isCorrect = false;
-  //   if (question.type === QuestionType.MCQ && payload.selectedOptionId) {
-  //     const selectedOption =
-  //       question.options &&
-  //       question.options.find((opt) => opt.id === payload.selectedOptionId);
-  //     if (!selectedOption) {
-  //       throw new BadRequestException({
-  //         success: false,
-  //         message: 'Option selected does not belong to the current question.',
-  //         data: null,
-  //       });
-  //     }
-  //     isCorrect = selectedOption.isCorrect;
-  //   } else if (question.type === QuestionType.TRUE_OR_FALSE) {
-  //     isCorrect =
-  //       question.correctAnswerBoolean === payload.selectedBooleanAnswer;
-  //   } else if (question.type === QuestionType.FILL_IN_THE_BLANKS) {
-  //     isCorrect = !!(
-  //       payload.selectedTextAnswer &&
-  //       payload.selectedTextAnswer.trim().toLowerCase() ===
-  //         question.correctAnswerText?.trim().toLowerCase()
-  //     );
-  //   }
-
-  //   let existingAttempt = await this.questionAttemptRepository
-  //     .createQueryBuilder('attempt')
-  //     .leftJoinAndSelect('attempt.questionSetAttempt', 'questionSetAttempt')
-  //     .leftJoinAndSelect('attempt.question', 'question')
-  //     .where('questionSetAttempt.id = :questionSetAttemptId', {
-  //       questionSetAttemptId,
-  //     })
-  //     .andWhere('question.id = :questionId', { questionId })
-  //     .getOne();
-
-  //   if (!existingAttempt) {
-  //     existingAttempt = this.questionAttemptRepository.create({
-  //       questionSetAttempt,
-  //       question,
-  //     });
-  //   }
-
-  //   existingAttempt.selectedOptionId = payload.selectedOptionId;
-  //   existingAttempt.selectedBooleanAnswer = payload.selectedBooleanAnswer;
-  //   existingAttempt.selectedTextAnswer = payload.selectedTextAnswer;
-  //   existingAttempt.isCorrect = isCorrect;
-
-  //   await this.questionAttemptRepository.save(existingAttempt);
-
-  //   return { success: true, message: 'Question attempted successfully' };
-  // }
 
   async finishQuiz(questionSetAttemptId: string) {
     const questionSetAttempt = await this.questionSetAttemptsRepository
