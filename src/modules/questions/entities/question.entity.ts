@@ -26,7 +26,7 @@ export class Question {
   id: string;
 
   @Column({ type: 'varchar', length: 500 })
-  question: string;
+  questionText: string;
 
   @Column({ type: 'enum', enum: QuestionType })
   type: QuestionType;

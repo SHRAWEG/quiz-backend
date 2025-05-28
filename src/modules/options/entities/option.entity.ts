@@ -13,7 +13,7 @@ export class Option {
   id: string;
 
   @Column()
-  option: string;
+  option_text: string;
 
   @Column()
   questionId: string;

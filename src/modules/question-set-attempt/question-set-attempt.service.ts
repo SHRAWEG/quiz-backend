@@ -170,15 +170,37 @@ export class QuestionSetAttemptService {
 
     const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
-      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
-      .leftJoinAndSelect(
-        'questionSetAttempt.questionAttempts',
-        'questionAttempt',
-      )
-      .leftJoinAndSelect('questionAttempt.question', 'question')
-      .leftJoinAndSelect('question.options', 'option')
-      .leftJoinAndSelect('question.subject', 'subject')
-      .leftJoinAndSelect('question.subSubject', 'subSubject')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet') // include all fields
+      .leftJoinAndSelect('questionSet.category', 'category') // include all fields
+      .leftJoin('questionSetAttempt.questionAttempts', 'questionAttempt')
+      .leftJoin('questionAttempt.question', 'question') // don't select all fields
+      .leftJoin('question.options', 'option') // don't select all fields
+      .leftJoinAndSelect('question.subject', 'subject') // include all fields
+      .leftJoinAndSelect('question.subSubject', 'subSubject') // include all fields
+      // Select specific fields from `questionAttempt`
+      .addSelect([
+        'questionAttempt.id',
+        'questionAttempt.selectedTextAnswer',
+        'questionAttempt.selectedBooleanAnswer',
+        'questionAttempt.selectedOptionId',
+        'questionAttempt.questionId',
+        'questionAttempt.createdAt',
+        'questionAttempt.updatedAt',
+      ])
+      // Select specific fields from `question`
+      .addSelect([
+        'question.id',
+        'question.questionText',
+        'question.type',
+        'question.difficulty',
+        'question.subjectId',
+        'question.subSubjectId',
+        'question.createdAt',
+        'question.updatedAt',
+      ])
+      // Select specific fields from `option`
+      .addSelect(['option.id', 'option.option_text'])
+
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
       .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
       .orderBy('questionAttempt.createdAt', 'ASC')
@@ -192,60 +214,60 @@ export class QuestionSetAttemptService {
       });
     }
 
-    const formattedAttempts = questionSetAttempt.questionAttempts.map(
-      (attempt) => ({
-        id: attempt.id,
-        selectedAnswer:
-          attempt.selectedOptionId ??
-          attempt.selectedBooleanAnswer ??
-          attempt.selectedTextAnswer ??
-          null,
-        question: {
-          id: attempt.question.id,
-          question: attempt.question.question,
-          type: attempt.question.type,
-          difficulty: attempt.question.difficulty,
-          subject: {
-            id: attempt.question.subject?.id,
-            name: attempt.question.subject?.name,
-          },
-          subSubject: {
-            id: attempt.question.subSubject?.id,
-            name: attempt.question.subSubject?.name,
-          },
-          options: attempt.question.options?.map((opt) => ({
-            id: opt.id,
-            option: opt.option,
-          })),
-        },
-      }),
-    );
+    // const formattedAttempts = questionSetAttempt.questionAttempts.map(
+    //   (attempt) => ({
+    //     id: attempt.id,
+    //     selectedAnswer:
+    //       attempt.selectedOptionId ??
+    //       attempt.selectedBooleanAnswer ??
+    //       attempt.selectedTextAnswer ??
+    //       null,
+    //     question: {
+    //       id: attempt.question.id,
+    //       question: attempt.question.questionText,
+    //       type: attempt.question.type,
+    //       difficulty: attempt.question.difficulty,
+    //       subject: {
+    //         id: attempt.question.subject?.id,
+    //         name: attempt.question.subject?.name,
+    //       },
+    //       subSubject: {
+    //         id: attempt.question.subSubject?.id,
+    //         name: attempt.question.subSubject?.name,
+    //       },
+    //       options: attempt.question.options?.map((opt) => ({
+    //         id: opt.id,
+    //         option: opt.option_text,
+    //       })),
+    //     },
+    //   }),
+    // );
 
-    const attemptedQuestionsCount = questionSetAttempt.questionAttempts.filter(
-      (a) =>
-        (a.selectedOptionId !== null && a.selectedOptionId !== undefined) ||
-        (a.selectedBooleanAnswer !== null &&
-          a.selectedBooleanAnswer !== undefined) ||
-        (a.selectedTextAnswer && a.selectedTextAnswer.trim() !== ''),
-    ).length;
+    // const attemptedQuestionsCount = questionSetAttempt.questionAttempts.filter(
+    //   (a) =>
+    //     (a.selectedOptionId !== null && a.selectedOptionId !== undefined) ||
+    //     (a.selectedBooleanAnswer !== null &&
+    //       a.selectedBooleanAnswer !== undefined) ||
+    //     (a.selectedTextAnswer && a.selectedTextAnswer.trim() !== ''),
+    // ).length;
 
-    const formatted = {
-      id: questionSetAttempt.id,
-      questionSetId: questionSetAttempt.questionSet.id,
-      startedAt: questionSetAttempt.startedAt,
-      completedAt: questionSetAttempt.completedAt,
-      isCompleted: questionSetAttempt.isCompleted,
-      questionSetName: questionSetAttempt.questionSet.name,
-      questionSetCategory: questionSetAttempt.questionSet.category,
-      questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
-      attemptedQuestionsCount,
-      questionAttepts: formattedAttempts,
-    };
+    // const formatted = {
+    //   id: questionSetAttempt.id,
+    //   questionSetId: questionSetAttempt.questionSet.id,
+    //   startedAt: questionSetAttempt.startedAt,
+    //   completedAt: questionSetAttempt.completedAt,
+    //   isCompleted: questionSetAttempt.isCompleted,
+    //   questionSetName: questionSetAttempt.questionSet.name,
+    //   questionSetCategory: questionSetAttempt.questionSet.category,
+    //   questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
+    //   attemptedQuestionsCount,
+    //   questionAttepts: formattedAttempts,
+    // };
 
     return {
       success: true,
       message: 'Question set fetch successful.',
-      data: formatted,
+      data: questionSetAttempt,
     };
   }
 
@@ -286,89 +308,89 @@ export class QuestionSetAttemptService {
       });
     }
 
-    const questionAttempts = questionSetAttempt.questionAttempts.map(
-      (attempt) => {
-        const { question } = attempt;
+    // const questionAttempts = questionSetAttempt.questionAttempts.map(
+    //   (attempt) => {
+    //     const { question } = attempt;
 
-        const selectedAnswer =
-          attempt.selectedOptionId ??
-          attempt.selectedBooleanAnswer ??
-          attempt.selectedTextAnswer ??
-          null;
+    //     const selectedAnswer =
+    //       attempt.selectedOptionId ??
+    //       attempt.selectedBooleanAnswer ??
+    //       attempt.selectedTextAnswer ??
+    //       null;
 
-        // We use stored `isCorrect` and pull correct answer from question
-        let correctAnswer: string | boolean | null = null;
+    //     // We use stored `isCorrect` and pull correct answer from question
+    //     let correctAnswer: string | boolean | null = null;
 
-        switch (question.type) {
-          case QuestionType.MCQ:
-            correctAnswer =
-              question.options?.find((opt) => opt.isCorrect)?.id ?? null;
-            break;
-          case QuestionType.TRUE_OR_FALSE:
-            correctAnswer =
-              typeof question.correctAnswerBoolean == 'boolean'
-                ? question.correctAnswerBoolean
-                : null;
-            break;
-          case QuestionType.FILL_IN_THE_BLANKS:
-            correctAnswer =
-              typeof question.correctAnswerText == 'string'
-                ? question.correctAnswerText
-                : null;
-            break;
-        }
+    //     switch (question.type) {
+    //       case QuestionType.MCQ:
+    //         correctAnswer =
+    //           question.options?.find((opt) => opt.isCorrect)?.id ?? null;
+    //         break;
+    //       case QuestionType.TRUE_OR_FALSE:
+    //         correctAnswer =
+    //           typeof question.correctAnswerBoolean == 'boolean'
+    //             ? question.correctAnswerBoolean
+    //             : null;
+    //         break;
+    //       case QuestionType.FILL_IN_THE_BLANKS:
+    //         correctAnswer =
+    //           typeof question.correctAnswerText == 'string'
+    //             ? question.correctAnswerText
+    //             : null;
+    //         break;
+    //     }
 
-        return {
-          id: attempt.id,
-          selectedAnswer,
-          isCorrect: attempt.isCorrect,
-          question: {
-            id: question.id,
-            question: question.question,
-            type: question.type,
-            difficulty: question.difficulty,
-            subject: {
-              id: question.subject?.id,
-              name: question.subject?.name,
-            },
-            subSubject: {
-              id: question.subSubject?.id,
-              name: question.subSubject?.name,
-            },
-            options: question.options?.map((opt) => ({
-              id: opt.id,
-              option: opt.option,
-              isCorrect: opt.isCorrect,
-            })),
-            correctAnswer,
-          },
-        };
-      },
-    );
+    //     return {
+    //       id: attempt.id,
+    //       selectedAnswer,
+    //       isCorrect: attempt.isCorrect,
+    //       question: {
+    //         id: question.id,
+    //         question: question.questionText,
+    //         type: question.type,
+    //         difficulty: question.difficulty,
+    //         subject: {
+    //           id: question.subject?.id,
+    //           name: question.subject?.name,
+    //         },
+    //         subSubject: {
+    //           id: question.subSubject?.id,
+    //           name: question.subSubject?.name,
+    //         },
+    //         options: question.options?.map((opt) => ({
+    //           id: opt.id,
+    //           option: opt.option_text,
+    //           isCorrect: opt.isCorrect,
+    //         })),
+    //         correctAnswer,
+    //       },
+    //     };
+    //   },
+    // );
 
-    const attemptedQuestionsCount = questionAttempts.filter(
-      (a) => a.selectedAnswer !== null,
-    ).length;
+    // const attemptedQuestionsCount = questionAttempts.filter(
+    //   (a) => a.selectedAnswer !== null,
+    // ).length;
 
-    const report = {
-      id: questionSetAttempt.id,
-      questionSetId: questionSetAttempt.questionSet.id,
-      startedAt: questionSetAttempt.startedAt,
-      completedAt: questionSetAttempt.completedAt,
-      isCompleted: questionSetAttempt.isCompleted,
-      score: questionSetAttempt.score,
-      percentage: questionSetAttempt.percentage,
-      questionSetName: questionSetAttempt.questionSet.name,
-      questionSetCategory: questionSetAttempt.questionSet.category,
-      questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
-      attemptedQuestionsCount,
-      questionAttempts,
-    };
+    // const report = {
+    //   id: questionSetAttempt.id,
+    //   questionSetId: questionSetAttempt.questionSet.id,
+    //   startedAt: questionSetAttempt.startedAt,
+    //   completedAt: questionSetAttempt.completedAt,
+    //   isCompleted: questionSetAttempt.isCompleted,
+    //   score: questionSetAttempt.score,
+    //   percentage: questionSetAttempt.percentage,
+    //   questionSetName: questionSetAttempt.questionSet.name,
+    //   questionSetCategory: questionSetAttempt.questionSet.category,
+    //   questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
+    //   attemptedQuestionsCount,
+    //   questionAttempts,
+    // };
 
     return {
       success: true,
       message: 'Question set report generated successfully.',
-      data: report,
+      data: questionSetAttempt,
     };
   }
 

@@ -79,7 +79,7 @@ export class QuestionsService {
               options &&
               options.map((opt) =>
                 this.optionsRepository.create({
-                  option: opt.option,
+                  option_text: opt.option,
                   isCorrect: opt.isCorrect,
                 }),
               );
