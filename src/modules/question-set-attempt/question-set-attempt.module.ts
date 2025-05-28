@@ -21,8 +21,10 @@ import { QuestionSetAttemptService } from './question-set-attempt.service';
     ]),
     UsersModule,
     SubSubjectsModule,
+    // TimeExpiryModule,
   ],
   controllers: [QuestionSetAttemptController],
   providers: [QuestionSetAttemptService],
+  exports: [QuestionSetAttemptService],
 })
 export class QuestionSetAttemptModule {}

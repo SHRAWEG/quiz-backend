@@ -6,7 +6,7 @@ export class CreateOptionDto {
   @ApiProperty({ description: 'The text of the option', example: 'Option A' })
   @IsString()
   @IsNotEmpty()
-  option: string;
+  optionText: string;
 
   @ApiProperty({ description: 'Whether the option is correct', example: true })
   @Transform(({ value }) => value === 'true' || value === true)

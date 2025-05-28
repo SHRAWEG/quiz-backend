@@ -30,7 +30,7 @@ export class CreateQuestionDto {
   @IsUnique('questions', 'question', {
     message: 'This question already exists',
   })
-  question: string;
+  questionText: string;
 
   @ApiProperty({
     type: [CreateOptionDto],

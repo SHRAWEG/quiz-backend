@@ -60,7 +60,9 @@ export class QuestionsService {
     switch (type) {
       case QuestionType.MCQ:
         if (options) {
-          const texts = options.map((opt) => opt.option?.trim().toLowerCase());
+          const texts = options.map((opt) =>
+            opt.optionText?.trim().toLowerCase(),
+          );
           const unique = new Set(texts);
           const correctCount = options.filter(
             (opt) => opt.isCorrect === true,
@@ -79,7 +81,7 @@ export class QuestionsService {
               options &&
               options.map((opt) =>
                 this.optionsRepository.create({
-                  option_text: opt.option,
+                  optionText: opt.optionText,
                   isCorrect: opt.isCorrect,
                 }),
               );
@@ -292,7 +294,7 @@ export class QuestionsService {
         case QuestionType.MCQ:
           if (options) {
             const texts = options.map((opt) =>
-              opt.option?.trim().toLowerCase(),
+              opt.optionText?.trim().toLowerCase(),
             );
             const unique = new Set(texts);
             const correctCount = options.filter(

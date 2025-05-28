@@ -31,6 +31,9 @@ import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
+    // BullModule.forRoot({
+    //   ...bullConfig,
+    // }),
     TypeOrmModule.forFeature([
       Option,
       Question,

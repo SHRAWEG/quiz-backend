@@ -35,7 +35,7 @@ export class QuestionSet {
   createdById: string;
 
   @ManyToOne(() => Category, {
-    cascade: ['insert', 'update', 'remove'],
+    onDelete: 'RESTRICT', // Prevent deletion if referenced
   })
   @JoinColumn({ name: 'category_id' })
   category: Relation<Category>;

@@ -14,7 +14,7 @@ export class UniqueOptionsTextConstraint
   validate(options: CreateOptionDto[]) {
     if (!Array.isArray(options)) return false;
 
-    const texts = options.map((opt) => opt.option?.trim().toLowerCase());
+    const texts = options.map((opt) => opt.optionText?.trim().toLowerCase());
     const unique = new Set(texts);
     return unique.size === texts.length;
   }

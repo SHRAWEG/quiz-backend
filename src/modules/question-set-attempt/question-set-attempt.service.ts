@@ -31,6 +31,7 @@ export class QuestionSetAttemptService {
     private readonly questionStatsRepository: Repository<QuestionStats>,
     private readonly dataSource: DataSource, // required for transaction
     @Inject(REQUEST) private readonly request: Request,
+    // private readonly timeExpiryService: TimeExpiryService,
   ) {}
 
   async startQuestionSetAttempt(questionSetId: string) {
@@ -100,7 +101,15 @@ export class QuestionSetAttemptService {
         }
         await questionStatRepo.save(questionStat);
       }
+
       await queryRunner.commitTransaction();
+      // --- Schedule the timeout job here ---
+      // if (questionSet.timeLimitSeconds) {
+      //   await this.timeExpiryService.startTimeoutJob(
+      //     questionSetAttempt.id,
+      //     questionSet.timeLimitSeconds,
+      //   );
+      // }
       return {
         success: true,
         message: 'Quiz started, Best of luck student.',
@@ -118,35 +127,6 @@ export class QuestionSetAttemptService {
     } finally {
       await queryRunner.release();
     }
-    // const questionSet = await this.questionSetRepository
-    //   .createQueryBuilder('questionSet')
-    //   .where('questionSet.id = :questionSetId', {
-    //     questionSetId: questionSetId,
-    //   })
-    //   .getOne();
-    // if (!questionSet) {
-    //   throw new NotFoundException({
-    //     success: false,
-    //     message: 'Question Set nof found to start quiz.',
-    //     data: null,
-    //   });
-    // }
-    // const questionSetAttemptPayload = this.questionSetAttemptsRepository.create(
-    //   {
-    //     userId: user?.sub,
-    //     questionSet: { id: questionSet.id },
-    //     isCompleted: false,
-    //     startedAt: new Date(),
-    //   },
-    // );
-    // const questionSetAttempt = await this.questionSetAttemptsRepository.save(
-    //   questionSetAttemptPayload,
-    // );
-    // return {
-    //   success: true,
-    //   message: 'Quiz started, Best of luck student.',
-    //   data: questionSetAttempt,
-    // };
   }
 
   async getQuestionSetAttempts() {
@@ -277,6 +257,7 @@ export class QuestionSetAttemptService {
     const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.category', 'category')
       .leftJoinAndSelect(
         'questionSetAttempt.questionAttempts',
         'questionAttempt',
@@ -423,7 +404,6 @@ export class QuestionSetAttemptService {
       const timeLimit = questionSetAttempt.questionSet.timeLimitSeconds;
       const now = Date.now();
       const started = new Date(questionSetAttempt.startedAt).getTime();
-
       if (timeLimit && now - started > timeLimit * 1000) {
         throw new BadRequestException({
           success: false,
@@ -432,16 +412,21 @@ export class QuestionSetAttemptService {
         });
       }
 
-      const question = await queryRunner.manager
-        .getRepository(Question)
-        .createQueryBuilder('question')
+      const questionAttempt = await queryRunner.manager
+        .getRepository(QuestionAttempt)
+        .createQueryBuilder('questionAttempt')
+        .leftJoinAndSelect('questionAttempt.question', 'question')
         .leftJoinAndSelect('question.options', 'option')
-        .leftJoin('question.questionSets', 'questionSet')
-        .where('question.id = :questionId', { questionId: payload.questionId })
-        .andWhere('questionSet.id = :questionSetId', {
-          questionSetId: questionSetAttempt.questionSet.id,
+        .leftJoin('questionAttempt.questionSetAttempt', 'questionSetAttempt')
+        .where('questionAttempt.id = :questionAttemptId', {
+          questionAttemptId: payload.questionAttemptId,
+        })
+        .andWhere('questionSetAttempt.id = :questionSetAttemptId', {
+          questionSetAttemptId: questionSetAttemptId,
         })
         .getOne();
+
+      const question = questionAttempt?.question;
 
       if (!question) {
         throw new BadRequestException({
@@ -484,78 +469,36 @@ export class QuestionSetAttemptService {
         });
       }
 
-      let existingAttempt = await queryRunner.manager
-        .getRepository(QuestionAttempt)
-        .createQueryBuilder('questionAttempt')
-        .leftJoinAndSelect(
-          'questionAttempt.questionSetAttempt',
-          'questionSetAttempt',
-        )
-        .leftJoinAndSelect('questionAttempt.question', 'question')
-        .where('questionSetAttempt.id = :questionSetAttemptId', {
-          questionSetAttemptId,
-        })
-        .andWhere('question.id = :questionId', {
-          questionId: payload.questionId,
-        })
-        .getOne();
-
       // Update question stats before creating questionAttempt
-      let questionStats = await queryRunner.manager
+      const questionStats = await queryRunner.manager
         .getRepository(QuestionStats)
         .createQueryBuilder('questionStats')
         .leftJoinAndSelect('questionStats.question', 'question')
-        .where('question.id = :questionId', { questionId: payload.questionId })
+        .where('question.id = :questionId', { questionId: question.id })
         .getOne();
-      if (!questionStats) {
-        // Create new stats entry
-        questionStats = queryRunner.manager
-          .getRepository(QuestionStats)
-          .create({
-            question,
-            timesUsed: 1,
-            timesAnsweredCorrectly: isCorrect ? 1 : 0,
-          });
+
+      if (isCorrect) {
+        questionStats!.timesAnsweredCorrectly = questionAttempt?.isCorrect
+          ? questionStats!.timesAnsweredCorrectly
+          : questionStats!.timesAnsweredCorrectly + 1;
       } else {
-        // Update the existing stats]
-        if (!existingAttempt) {
-          questionStats.timesUsed += 1;
-          questionStats.timesAnsweredCorrectly = isCorrect
-            ? questionStats.timesAnsweredCorrectly++
-            : questionStats.timesAnsweredCorrectly;
-        } else {
-          if (isCorrect) {
-            questionStats.timesAnsweredCorrectly = existingAttempt.isCorrect
-              ? questionStats.timesAnsweredCorrectly
-              : questionStats.timesAnsweredCorrectly + 1;
-          } else {
-            questionStats.timesAnsweredCorrectly = existingAttempt.isCorrect
-              ? questionStats.timesAnsweredCorrectly - 1
-              : questionStats.timesAnsweredCorrectly;
-          }
-        }
+        questionStats!.timesAnsweredCorrectly = questionAttempt?.isCorrect
+          ? questionStats!.timesAnsweredCorrectly - 1
+          : questionStats!.timesAnsweredCorrectly;
       }
+
       await queryRunner.manager
         .getRepository(QuestionStats)
-        .save(questionStats);
+        .save(questionStats!);
 
-      if (!existingAttempt) {
-        existingAttempt = queryRunner.manager
-          .getRepository(QuestionAttempt)
-          .create({
-            questionSetAttempt,
-            question,
-          });
-      }
-
-      existingAttempt.selectedOptionId = payload.selectedOptionId;
-      existingAttempt.selectedBooleanAnswer = payload.selectedBooleanAnswer;
-      existingAttempt.selectedTextAnswer = payload.selectedTextAnswer;
-      existingAttempt.isCorrect = isCorrect;
+      questionAttempt.selectedOptionId = payload.selectedOptionId;
+      questionAttempt.selectedBooleanAnswer = payload.selectedBooleanAnswer;
+      questionAttempt.selectedTextAnswer = payload.selectedTextAnswer;
+      questionAttempt.isCorrect = isCorrect;
 
       await queryRunner.manager
         .getRepository(QuestionAttempt)
-        .save(existingAttempt);
+        .save(questionAttempt);
 
       await queryRunner.commitTransaction();
 

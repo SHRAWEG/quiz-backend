@@ -1,7 +1,12 @@
-// dto/create-question-set.dto.ts
-
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsPositive,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateQuestionSetDto {
   @ApiProperty({
@@ -16,13 +21,13 @@ export class CreateQuestionSetDto {
   @IsUUID()
   categoryId: string;
 
-  // @ApiProperty()
-  // @IsArray()
-  // @IsUUID('all', { each: true })
-  // @IdExists(Question, {
-  //   message: 'Some questions do not exists or are repeated',
-  // })
-  // questionIds: string[];
+  @ApiProperty({
+    example: 30,
+  })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  timeLimit: number;
 
   @ApiProperty()
   @IsBoolean()
