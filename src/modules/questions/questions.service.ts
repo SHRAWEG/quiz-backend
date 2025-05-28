@@ -152,7 +152,7 @@ export class QuestionsService {
       .take(limit);
 
     if (search) {
-      query.andWhere('question.question ILIKE :search', {
+      query.andWhere('question.questionText ILIKE :search', {
         search: `%${search}%`,
       });
     }
@@ -191,7 +191,7 @@ export class QuestionsService {
       .where('question.status = :status', { status: QuestionStatus.APPROVED });
 
     if (search) {
-      query.andWhere('question.question ILIKE :search', {
+      query.andWhere('question.questionText ILIKE :search', {
         search: `%${search}%`,
       });
     }

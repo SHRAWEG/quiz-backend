@@ -27,7 +27,7 @@ export class CreateQuestionDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
-  @IsUnique('questions', 'question', {
+  @IsUnique('questions', 'questionText', {
     message: 'This question already exists',
   })
   questionText: string;

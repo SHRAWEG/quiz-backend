@@ -179,7 +179,7 @@ export class QuestionSetAttemptService {
         'question.updatedAt',
       ])
       // Select specific fields from `option`
-      .addSelect(['option.id', 'option.option_text'])
+      .addSelect(['option.id', 'option.optionText'])
 
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
       .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
