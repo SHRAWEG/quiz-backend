@@ -25,6 +25,9 @@ export class QuestionSetAttempt {
   startedAt: Date;
 
   @Column({ type: 'timestamp', nullable: true })
+  expiryAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
   completedAt: Date;
 
   @Column({ default: false })

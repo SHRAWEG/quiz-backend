@@ -31,23 +31,14 @@ export class QuestionSet {
   @Column()
   status: QuestionSetStatus;
 
-  @Column({ type: 'text' })
-  createdById: string;
-
-  @ManyToOne(() => Category, {
-    onDelete: 'RESTRICT', // Prevent deletion if referenced
-  })
-  @JoinColumn({ name: 'category_id' })
-  category: Relation<Category>;
+  @Column({ default: false })
+  isTimeLimited: boolean;
 
   @Column({ type: 'integer', nullable: true }) // time in seconds
   timeLimitSeconds?: number;
 
-  @ManyToOne(() => User, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'created_by_id' })
-  createdBy: Relation<User>;
+  @Column({ type: 'text' })
+  createdById: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
@@ -58,6 +49,18 @@ export class QuestionSet {
     onUpdate: 'CURRENT_TIMESTAMP',
   })
   updatedAt: Date;
+
+  @ManyToOne(() => Category, {
+    onDelete: 'RESTRICT', // Prevent deletion if referenced
+  })
+  @JoinColumn({ name: 'category_id' })
+  category: Relation<Category>;
+
+  @ManyToOne(() => User, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'created_by_id' })
+  createdBy: Relation<User>;
 
   @Column()
   name: string;

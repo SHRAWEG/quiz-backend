@@ -41,6 +41,8 @@ export class QuestionSetsService {
       const questionSet = new QuestionSet();
       questionSet.name = dto.name;
       questionSet.isFree = dto.isFree;
+      questionSet.isTimeLimited = dto.isTimeLimited;
+      questionSet.timeLimitSeconds = dto.timeLimitSeconds;
       questionSet.categoryId = dto.categoryId;
       questionSet.status = QuestionSetStatus.DRAFT;
       questionSet.createdById = user!.sub;
@@ -59,9 +61,9 @@ export class QuestionSetsService {
 
       // Retrieve the created QuestionSet with its questions (if any)
       const newQuestionSet = await queryRunner.manager
-        .createQueryBuilder(QuestionSet, 'qs')
-        .leftJoinAndSelect('qs.questions', 'q')
-        .where('qs.id = :id', {
+        .createQueryBuilder(QuestionSet, 'questionSet')
+        .leftJoinAndSelect('questionSet.questions', 'q')
+        .where('questionSet.id = :id', {
           id: (insertedQuestionSet.generatedMaps[0].id as string) || '',
         })
         .getOne();

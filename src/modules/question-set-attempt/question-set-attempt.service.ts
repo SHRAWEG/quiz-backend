@@ -9,8 +9,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { QuestionType } from 'src/common/enums/question.enum';
 import { QuestionSetAttempt } from 'src/modules/question-set-attempt/entities/question-set-attempt.entity';
-import { QuestionSet } from 'src/modules/question-sets/entities/question-set.entity';
-import { DataSource, Repository } from 'typeorm';
+import {
+  QuestionSet,
+  QuestionSetStatus,
+} from 'src/modules/question-sets/entities/question-set.entity';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { QuestionAttempt } from '../question-attempt/entities/question-attempt.entity';
 import { QuestionStats } from '../question-stats/entities/question-stat.entity';
 import { Question } from '../questions/entities/question.entity';
@@ -36,10 +39,12 @@ export class QuestionSetAttemptService {
 
   async startQuestionSetAttempt(questionSetId: string) {
     const user = this.request.user;
+    // INITIALIZING AND STARTING THE DB TRANSACTION
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      // REPOSITORY INITIALIZATION
       const questionSetRepo = queryRunner.manager.getRepository(QuestionSet);
       const questionSetAttemptRepo =
         queryRunner.manager.getRepository(QuestionSetAttempt);
@@ -47,26 +52,38 @@ export class QuestionSetAttemptService {
         queryRunner.manager.getRepository(QuestionAttempt);
       const questionStatRepo = queryRunner.manager.getRepository(QuestionStats);
 
+      //
       const questionSet = await questionSetRepo
         .createQueryBuilder('questionSet')
         .leftJoinAndSelect('questionSet.questions', 'question')
         .where('questionSet.id = :questionSetId', {
           questionSetId: questionSetId,
         })
+        .andWhere('questionSet.status = status', {
+          status: QuestionSetStatus.PUBLISHED,
+        })
         .getOne();
 
       if (!questionSet) {
         throw new NotFoundException({
           success: false,
-          message: 'Question Set nof found to start quiz.',
+          message: 'Question Set not found to start quiz.',
           data: null,
         });
       }
+
+      const now = new Date();
+      const expiryAt =
+        questionSet.isTimeLimited && questionSet.timeLimitSeconds
+          ? new Date(now.getTime() + questionSet.timeLimitSeconds * 1000)
+          : null;
+
       const questionSetAttemptPayload = questionSetAttemptRepo.create({
         userId: user?.sub,
         questionSet: { id: questionSet.id },
         isCompleted: false,
-        startedAt: new Date(),
+        startedAt: now,
+        expiryAt: expiryAt,
       });
       const questionSetAttempt = await questionSetAttemptRepo.save(
         questionSetAttemptPayload,
@@ -103,17 +120,22 @@ export class QuestionSetAttemptService {
       }
 
       await queryRunner.commitTransaction();
-      // --- Schedule the timeout job here ---
-      // if (questionSet.timeLimitSeconds) {
-      //   await this.timeExpiryService.startTimeoutJob(
-      //     questionSetAttempt.id,
-      //     questionSet.timeLimitSeconds,
-      //   );
-      // }
+
+      const remainingTimeSeconds =
+        questionSet.isTimeLimited && expiryAt
+          ? Math.max(0, Math.floor((expiryAt.getTime() - now.getTime()) / 1000))
+          : null;
+
       return {
         success: true,
         message: 'Quiz started, Best of luck student.',
-        data: questionSetAttempt,
+        data: {
+          remainingTimeSeconds: remainingTimeSeconds,
+          serverTime: new Date().toISOString(),
+          expiryAt: expiryAt,
+          startedAt: now,
+          questionSetAttempt: questionSetAttempt,
+        },
       };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -180,10 +202,9 @@ export class QuestionSetAttemptService {
       ])
       // Select specific fields from `option`
       .addSelect(['option.id', 'option.optionText'])
-
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
       .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
-      .orderBy('questionAttempt.createdAt', 'ASC')
+      .orderBy('questionAttempt.id', 'ASC')
       .getOne();
 
     if (!questionSetAttempt) {
@@ -375,10 +396,61 @@ export class QuestionSetAttemptService {
     };
   }
 
+  async getQuizStatus(questionSetAttemptId: string) {
+    const user = this.request.user;
+    const now = new Date();
+
+    const questionSetAttempt = await this.questionSetAttemptsRepository
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
+      .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      .getOne();
+
+    if (!questionSetAttempt) {
+      throw new NotFoundException('Quiz attempt not found');
+    }
+
+    const remainingSeconds =
+      questionSetAttempt.questionSet.isTimeLimited &&
+      questionSetAttempt.expiryAt
+        ? Math.max(
+            0,
+            Math.floor(
+              (questionSetAttempt.expiryAt.getTime() - now.getTime()) / 1000,
+            ),
+          )
+        : null;
+
+    const isExpired =
+      questionSetAttempt.expiryAt && now > questionSetAttempt.expiryAt;
+
+    if (isExpired && !questionSetAttempt.isCompleted) {
+      // Auto-complete if expired
+      await this.completeQuiz(questionSetAttemptId);
+      questionSetAttempt.isCompleted = true;
+    }
+
+    return {
+      success: true,
+      data: {
+        id: questionSetAttempt.id,
+        startedAt: questionSetAttempt.startedAt,
+        expiryAt: questionSetAttempt.expiryAt,
+        timeLimitSeconds: questionSetAttempt.questionSet.timeLimitSeconds,
+        serverTime: now.toISOString(),
+        remainingTimeSeconds: remainingSeconds,
+        isCompleted: questionSetAttempt.isCompleted,
+        isExpired,
+      },
+    };
+  }
+
   async answerQuestion(
     questionSetAttemptId: string,
     payload: AnswerQuestionDto,
   ) {
+    const user = this.request.user;
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -391,20 +463,28 @@ export class QuestionSetAttemptService {
         .where('questionSetAttempt.id = :questionSetAttemptId', {
           questionSetAttemptId,
         })
+        .andWhere('quesitonSetAttempt.userId = :userId', {
+          userId: user!.sub,
+        })
         .getOne();
 
+      // CHECK IF THE QUESTION SET ATTEMPT EXISTS OR BELONGS TO THE USER OR NOT
       if (!questionSetAttempt || questionSetAttempt.isCompleted) {
         throw new BadRequestException({
           success: false,
-          message: 'Quiz not found or already completed.',
+          message:
+            'Quiz not found or already completed or does not belongs to the current user.',
           data: null,
         });
       }
 
-      const timeLimit = questionSetAttempt.questionSet.timeLimitSeconds;
-      const now = Date.now();
-      const started = new Date(questionSetAttempt.startedAt).getTime();
-      if (timeLimit && now - started > timeLimit * 1000) {
+      // CHECK IF THE QUIZ IS EXPIRED
+      const now = new Date();
+      if (
+        questionSetAttempt.questionSet.isTimeLimited &&
+        questionSetAttempt.expiryAt &&
+        now > questionSetAttempt.expiryAt
+      ) {
         throw new BadRequestException({
           success: false,
           message: 'Time limit for this quiz has been exceeded.',
@@ -501,10 +581,27 @@ export class QuestionSetAttemptService {
         .save(questionAttempt);
 
       await queryRunner.commitTransaction();
+      // Calculate remaining time for response (only for time-limited quizzes)
+      const remainingSeconds =
+        questionSetAttempt.questionSet.isTimeLimited &&
+        questionSetAttempt.expiryAt
+          ? Math.max(
+              0,
+              Math.floor(
+                (questionSetAttempt.expiryAt.getTime() - now.getTime()) / 1000,
+              ),
+            )
+          : null;
 
       return {
         success: true,
         message: 'Answer submitted successfully.',
+        data: {
+          expiryAt: questionSetAttempt.expiryAt,
+          startedAt: questionSetAttempt.startedAt,
+          remainingTimeSeconds: remainingSeconds,
+          serverTime: now.toISOString(),
+        },
       };
     } catch (error: unknown) {
       await queryRunner.rollbackTransaction();
@@ -521,12 +618,16 @@ export class QuestionSetAttemptService {
   }
 
   async finishQuiz(questionSetAttemptId: string) {
+    const user = this.request.user;
     const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.questions', 'questions')
       .where('questionSetAttempt.id = :questionSetAttemptId', {
         questionSetAttemptId,
+      })
+      .andWhere('questionSetAttempt.userId = :userId', {
+        userId: user!.sub,
       })
       .getOne();
 
@@ -567,4 +668,42 @@ export class QuestionSetAttemptService {
       },
     };
   }
+
+  async completeQuiz(questionSetAttemptId: string, queryRunner?: QueryRunner) {
+    const manager = queryRunner?.manager || this.dataSource.manager;
+
+    const questionSetAttempt = await manager
+      .getRepository(QuestionSetAttempt)
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttept.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.questions', 'question')
+      .getOne();
+    // .findOne({
+    //   where: { id: questionSetAttemptId },
+    //   relations: ['questionSet', 'questionSet.questions'],
+    // });
+
+    if (!questionSetAttempt || questionSetAttempt.isCompleted) return;
+
+    const questionAttempts = await manager
+      .getRepository(QuestionAttempt)
+      .createQueryBuilder('questionAttempt')
+      .where('questionAttempt.questionSetAttemptId = :questionSetAttemptId', {
+        questionSetAttemptId: questionSetAttemptId,
+      })
+      .getMany();
+
+    const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
+    const total = questionSetAttempt.questionSet.questions.length;
+    questionSetAttempt.isCompleted = true;
+    questionSetAttempt.completedAt = new Date();
+    questionSetAttempt.score = correctCount;
+    questionSetAttempt.percentage =
+      total > 0 ? (correctCount / total) * 100 : 0;
+    await manager.getRepository(QuestionSetAttempt).save(questionSetAttempt);
+  }
+
+  // Background job to auto-complete expired quizzes
+  // @Cron(CronExpression.EVERY_MINUTE) // Run every minute
+  // @Cron('*/10 * * * * *') // Run 10 seconds
 }

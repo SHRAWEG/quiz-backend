@@ -14,10 +14,12 @@ import { VerificationToken } from './modules/users/entities/verification-token.e
 import { EmailService } from './modules/email/email.service';
 import { UsersService } from './modules/users/users.service';
 // MODULES
+import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CategoriesModule } from './modules/categories/category.module';
 import { Category } from './modules/categories/entities/category.entity';
+import { CronTaskModule } from './modules/cron-task/cron-task.module';
 import { OptionsModule } from './modules/options/options.module';
 import { QuestionAttemptModule } from './modules/question-attempt/question-attempt.module';
 import { QuestionSetAttemptModule } from './modules/question-set-attempt/question-set-attempt.module';
@@ -31,9 +33,7 @@ import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
-    // BullModule.forRoot({
-    //   ...bullConfig,
-    // }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forFeature([
       Option,
       Question,
@@ -70,6 +70,7 @@ import { UsersModule } from './modules/users/users.module';
     QuestionSetAttemptModule,
     QuestionAttemptModule,
     QuestionStatsModule,
+    CronTaskModule,
   ],
   controllers: [],
   providers: [UsersService, EmailService],

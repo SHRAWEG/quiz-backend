@@ -2,10 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
-  IsOptional,
   IsPositive,
   IsString,
   IsUUID,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateQuestionSetDto {
@@ -21,15 +21,20 @@ export class CreateQuestionSetDto {
   @IsUUID()
   categoryId: string;
 
-  @ApiProperty({
-    example: 30,
-  })
-  @IsOptional()
-  @IsInt()
-  @IsPositive()
-  timeLimit: number;
-
   @ApiProperty()
   @IsBoolean()
   isFree: boolean;
+
+  @ApiProperty()
+  @IsBoolean()
+  isTimeLimited: boolean;
+
+  @ApiProperty({
+    example: 30,
+    required: false,
+  })
+  @ValidateIf((o: CreateQuestionSetDto) => o.isTimeLimited === true)
+  @IsInt()
+  @IsPositive()
+  timeLimitSeconds?: number;
 }
