@@ -121,20 +121,21 @@ export class QuestionSetAttemptService {
 
       await queryRunner.commitTransaction();
 
-      const remainingTimeSeconds =
-        questionSet.isTimeLimited && expiryAt
-          ? Math.max(0, Math.floor((expiryAt.getTime() - now.getTime()) / 1000))
-          : null;
+      // const remainingTimeSeconds =
+      //   questionSet.isTimeLimited && expiryAt
+      //     ? Math.max(0, Math.floor((expiryAt.getTime() - now.getTime()) / 1000))
+      //     : null;
 
       return {
         success: true,
         message: 'Quiz started, Best of luck student.',
         data: {
-          remainingTimeSeconds: remainingTimeSeconds,
-          serverTime: new Date().toISOString(),
-          expiryAt: expiryAt,
-          startedAt: now,
-          questionSetAttempt: questionSetAttempt,
+          // remainingTimeSeconds: remainingTimeSeconds,
+          // serverTime: new Date().toISOString(),
+          // expiryAt: expiryAt,
+          // startedAt: now,
+          // questionSetAttempt:
+          ...questionSetAttempt,
         },
       };
     } catch (error) {
