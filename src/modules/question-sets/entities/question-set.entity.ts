@@ -1,4 +1,5 @@
 import { Category } from 'src/modules/categories/entities/category.entity';
+import { QuestionSetAttempt } from 'src/modules/question-set-attempt/entities/question-set-attempt.entity';
 import { Question } from 'src/modules/questions/entities/question.entity';
 import { User } from 'src/modules/users/entities/user.entity';
 import {
@@ -8,6 +9,7 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   Relation,
 } from 'typeorm';
@@ -77,4 +79,9 @@ export class QuestionSet {
     },
   })
   questions: Question[];
+
+  @OneToMany(() => QuestionSetAttempt, (attempt) => attempt.questionSet, {
+    cascade: false,
+  })
+  questionSetAttempts: QuestionSetAttempt[];
 }

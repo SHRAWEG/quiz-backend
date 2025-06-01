@@ -464,7 +464,7 @@ export class QuestionSetAttemptService {
         .where('questionSetAttempt.id = :questionSetAttemptId', {
           questionSetAttemptId,
         })
-        .andWhere('quesitonSetAttempt.userId = :userId', {
+        .andWhere('questionSetAttempt.userId = :userId', {
           userId: user!.sub,
         })
         .getOne();
@@ -605,6 +605,7 @@ export class QuestionSetAttemptService {
         },
       };
     } catch (error: unknown) {
+      console.log('ERROR : ', error);
       await queryRunner.rollbackTransaction();
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to submit answer.';

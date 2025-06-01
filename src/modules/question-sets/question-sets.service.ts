@@ -436,11 +436,21 @@ export class QuestionSetsService {
   async delete(id: string) {
     const questionSet = await this.questionSetRepository
       .createQueryBuilder('questionSet')
+      .leftJoinAndSelect('questionSet.questionSetAttempts', 'attempt')
       .where('questionSet.id = :id', { id })
       .getOne();
 
     if (!questionSet) {
       throw new NotFoundException('QuestionSet not found');
+    }
+
+    if (
+      questionSet.questionSetAttempts &&
+      questionSet.questionSetAttempts.length > 0
+    ) {
+      throw new BadRequestException(
+        'Cannot delete a question set that has been attempted.',
+      );
     }
 
     await this.questionSetRepository
@@ -449,9 +459,10 @@ export class QuestionSetsService {
       .from(QuestionSet)
       .where('id = :id', { id })
       .execute();
+
     return {
       success: true,
-      message: 'Question set deleted succesfully',
+      message: 'Question set deleted successfully',
       data: id,
     };
   }
