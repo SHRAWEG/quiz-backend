@@ -59,7 +59,7 @@ export class QuestionSetAttemptService {
         .where('questionSet.id = :questionSetId', {
           questionSetId: questionSetId,
         })
-        .andWhere('questionSet.status = status', {
+        .andWhere('questionSet.status = :status', {
           status: QuestionSetStatus.PUBLISHED,
         })
         .getOne();
@@ -396,7 +396,7 @@ export class QuestionSetAttemptService {
     };
   }
 
-  async getQuizStatus(questionSetAttemptId: string) {
+  async getQuestionSetAttemptStatus(questionSetAttemptId: string) {
     const user = this.request.user;
     const now = new Date();
 

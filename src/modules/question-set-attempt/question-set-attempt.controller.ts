@@ -58,6 +58,16 @@ export class QuestionSetAttemptController {
     );
   }
 
+  // Get Question set Attempt Status for time and completion status.
+  @Get('/status/:questionSetAttemptId')
+  async getQuestionSetAttemptStatus(
+    @Param('questionSetAttemptId') questionSetAttemptId: string,
+  ) {
+    return await this.questionSetAttemptService.getQuestionSetAttemptStatus(
+      questionSetAttemptId,
+    );
+  }
+
   // Submit an answer (could be in QuestionAttemptsController ideally)
   @Post('/answer/:questionSetAttemptId')
   async answerQuestion(
