@@ -25,8 +25,11 @@ export class QuestionAttempt {
   @Column({ type: 'uuid', nullable: true })
   selectedOptionId?: string; // For MCQs
 
-  @Column({ default: false })
-  isCorrect: boolean;
+  @Column({ type: 'boolean', nullable: true })
+  isChecked: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  isCorrect: boolean | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

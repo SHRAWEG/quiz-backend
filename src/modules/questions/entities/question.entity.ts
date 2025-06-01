@@ -6,6 +6,7 @@ import {
 import { Option } from 'src/modules/options/entities/option.entity';
 import { QuestionAttempt } from 'src/modules/question-attempt/entities/question-attempt.entity';
 import { QuestionSet } from 'src/modules/question-sets/entities/question-set.entity';
+import { QuestionStats } from 'src/modules/question-stats/entities/question-stat.entity';
 import { SubSubject } from 'src/modules/sub-subjects/entities/sub-subject.entity';
 import { Subject } from 'src/modules/subjects/entities/subject.entity';
 import { User } from 'src/modules/users/entities/user.entity';
@@ -16,6 +17,7 @@ import {
   ManyToMany,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   Relation,
 } from 'typeorm';
@@ -104,4 +106,10 @@ export class Question {
 
   @ManyToMany(() => QuestionSet, (questionSet) => questionSet.questions)
   questionSets: QuestionSet[];
+
+  @OneToOne(() => QuestionStats, (questionStats) => questionStats.question, {
+    cascade: true,
+  })
+  @JoinColumn({ name: 'id', referencedColumnName: 'questionId' })
+  questionStats: QuestionStats;
 }

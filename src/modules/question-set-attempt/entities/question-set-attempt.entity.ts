@@ -33,6 +33,9 @@ export class QuestionSetAttempt {
   @Column({ default: false })
   isCompleted: boolean;
 
+  @Column({ type: 'boolean', nullable: true })
+  isChecked: boolean | null;
+
   @Column({ type: 'int', nullable: true })
   score: number;
 

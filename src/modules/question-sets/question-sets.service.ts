@@ -92,12 +92,24 @@ export class QuestionSetsService {
     const questionSet = await this.questionSetRepository
       .createQueryBuilder('questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question') // This automatically joins the relation via the join table
+      .leftJoinAndSelect(
+        'questionSet.questionSetAttempts',
+        'questionSetAttempt',
+      )
       .leftJoinAndSelect('question.options', 'option')
       .where('questionSet.id = :id', { id: dto.questionSetId })
       .getOne();
 
     if (!questionSet) {
       throw new NotFoundException('Question set not found');
+    }
+    if (
+      questionSet.questionSetAttempts &&
+      questionSet.questionSetAttempts.length > 0
+    ) {
+      throw new BadRequestException(
+        'Cannot add a question to the set that has been attempted.',
+      );
     }
 
     // 2. Check if the question is already linked
@@ -149,11 +161,24 @@ export class QuestionSetsService {
     const questionSet = await this.questionSetRepository
       .createQueryBuilder('questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
+      .leftJoinAndSelect(
+        'questionSet.questionSetAttempts',
+        'questionSetAttempt',
+      )
       .where('questionSet.id = :id', { id: questionSetId })
       .getOne();
 
     if (!questionSet) {
       throw new NotFoundException('Question set not found');
+    }
+
+    if (
+      questionSet.questionSetAttempts &&
+      questionSet.questionSetAttempts.length > 0
+    ) {
+      throw new BadRequestException(
+        'Cannot remove a question from the set that has been attempted.',
+      );
     }
 
     // 2. Check if question is actually linked
@@ -364,13 +389,26 @@ export class QuestionSetsService {
 
   async update(id: string, dto: UpdateQuestionSetDto) {
     // 1. Check if the question set exists
-    const exists = await this.questionSetRepository
-      .createQueryBuilder('qs')
-      .where('qs.id = :id', { id })
-      .getExists();
+    const questionSet = await this.questionSetRepository
+      .createQueryBuilder('questionSet')
+      .leftJoinAndSelect(
+        'questionSet.questionSetAttempts',
+        'questionSetAttempt',
+      )
+      .where('questionSet.id = :id', { id })
+      .getOne();
 
-    if (!exists) {
+    if (!questionSet) {
       throw new NotFoundException('Question Set does not exist');
+    }
+
+    if (
+      questionSet.questionSetAttempts &&
+      questionSet.questionSetAttempts.length > 0
+    ) {
+      throw new BadRequestException(
+        'Cannot update a question set that has been attempted.',
+      );
     }
 
     // 2. Perform update
@@ -411,14 +449,24 @@ export class QuestionSetsService {
   }
 
   async draft(id: string) {
-    const exists = await this.questionSetRepository
-      .createQueryBuilder('qs')
-      .where('qs.id = :id', { id })
-      .getExists();
+    const questionSet = await this.questionSetRepository
+      .createQueryBuilder('questionSet')
+      .where('questionSet.id = :id', { id })
+      .getOne();
 
-    if (!exists) {
+    if (!questionSet) {
       throw new NotFoundException('Question Set does not exist');
     }
+
+    if (
+      questionSet.questionSetAttempts &&
+      questionSet.questionSetAttempts.length > 0
+    ) {
+      throw new BadRequestException(
+        'Cannot draft a question set that has been attempted.',
+      );
+    }
+
     const updatedQuestionSet = await this.questionSetRepository
       .createQueryBuilder()
       .update(QuestionSet)

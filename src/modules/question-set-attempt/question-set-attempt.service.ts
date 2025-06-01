@@ -16,8 +16,8 @@ import {
 import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { QuestionAttempt } from '../question-attempt/entities/question-attempt.entity';
 import { QuestionStats } from '../question-stats/entities/question-stat.entity';
-import { Question } from '../questions/entities/question.entity';
-import { AnswerQuestionDto } from './dto/question-attempt.dto';
+import { QuestionAttemptDto } from './dto/question-attempt.dto';
+import { ReviewAnswerDto } from './dto/review-answer.dto copy';
 
 @Injectable()
 export class QuestionSetAttemptService {
@@ -27,14 +27,8 @@ export class QuestionSetAttemptService {
     @InjectRepository(QuestionAttempt)
     private readonly questionAttemptRepository: Repository<QuestionAttempt>,
     @InjectRepository(QuestionSet)
-    private readonly questionSetRepository: Repository<QuestionSet>,
-    @InjectRepository(Question)
-    private readonly questionRepository: Repository<Question>,
-    @InjectRepository(QuestionStats)
-    private readonly questionStatsRepository: Repository<QuestionStats>,
-    private readonly dataSource: DataSource, // required for transaction
+    private readonly dataSource: DataSource,
     @Inject(REQUEST) private readonly request: Request,
-    // private readonly timeExpiryService: TimeExpiryService,
   ) {}
 
   async startQuestionSetAttempt(questionSetId: string) {
@@ -449,7 +443,7 @@ export class QuestionSetAttemptService {
 
   async answerQuestion(
     questionSetAttemptId: string,
-    payload: AnswerQuestionDto,
+    payload: QuestionAttemptDto,
   ) {
     const user = this.request.user;
     const queryRunner = this.dataSource.createQueryRunner();
@@ -518,7 +512,8 @@ export class QuestionSetAttemptService {
         });
       }
 
-      let isCorrect = false;
+      let isCorrect: boolean | null = false;
+      let isChecked: boolean | null = false;
       if (question.type === QuestionType.MCQ && payload.selectedOptionId) {
         const selectedOption =
           question.options &&
@@ -542,6 +537,12 @@ export class QuestionSetAttemptService {
           payload.selectedTextAnswer.trim().toLowerCase() ===
             question.correctAnswerText?.trim().toLowerCase()
         );
+      } else if (
+        question.type === QuestionType.SHORT ||
+        question.type === QuestionType.LONG
+      ) {
+        isCorrect = null;
+        isChecked = false;
       } else {
         throw new BadRequestException({
           success: false,
@@ -551,31 +552,39 @@ export class QuestionSetAttemptService {
       }
 
       // Update question stats before creating questionAttempt
-      const questionStats = await queryRunner.manager
-        .getRepository(QuestionStats)
-        .createQueryBuilder('questionStats')
-        .leftJoinAndSelect('questionStats.question', 'question')
-        .where('question.id = :questionId', { questionId: question.id })
-        .getOne();
+      // Update stats only for auto-evaluable question types
+      if (
+        question.type === QuestionType.MCQ ||
+        question.type === QuestionType.TRUE_OR_FALSE ||
+        question.type === QuestionType.FILL_IN_THE_BLANKS
+      ) {
+        const questionStats = await queryRunner.manager
+          .getRepository(QuestionStats)
+          .createQueryBuilder('questionStats')
+          .leftJoinAndSelect('questionStats.question', 'question')
+          .where('question.id = :questionId', { questionId: question.id })
+          .getOne();
 
-      if (isCorrect) {
-        questionStats!.timesAnsweredCorrectly = questionAttempt?.isCorrect
-          ? questionStats!.timesAnsweredCorrectly
-          : questionStats!.timesAnsweredCorrectly + 1;
-      } else {
-        questionStats!.timesAnsweredCorrectly = questionAttempt?.isCorrect
-          ? questionStats!.timesAnsweredCorrectly - 1
-          : questionStats!.timesAnsweredCorrectly;
+        if (isCorrect) {
+          questionStats!.timesAnsweredCorrectly = questionAttempt?.isCorrect
+            ? questionStats!.timesAnsweredCorrectly
+            : questionStats!.timesAnsweredCorrectly + 1;
+        } else {
+          questionStats!.timesAnsweredCorrectly = questionAttempt?.isCorrect
+            ? questionStats!.timesAnsweredCorrectly - 1
+            : questionStats!.timesAnsweredCorrectly;
+        }
+
+        await queryRunner.manager
+          .getRepository(QuestionStats)
+          .save(questionStats!);
       }
-
-      await queryRunner.manager
-        .getRepository(QuestionStats)
-        .save(questionStats!);
 
       questionAttempt.selectedOptionId = payload.selectedOptionId;
       questionAttempt.selectedBooleanAnswer = payload.selectedBooleanAnswer;
       questionAttempt.selectedTextAnswer = payload.selectedTextAnswer;
       questionAttempt.isCorrect = isCorrect;
+      questionAttempt.isChecked = isChecked;
 
       await queryRunner.manager
         .getRepository(QuestionAttempt)
@@ -605,7 +614,6 @@ export class QuestionSetAttemptService {
         },
       };
     } catch (error: unknown) {
-      console.log('ERROR : ', error);
       await queryRunner.rollbackTransaction();
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to submit answer.';
@@ -641,15 +649,20 @@ export class QuestionSetAttemptService {
       });
     }
 
-    const attempts = await this.questionAttemptRepository
+    const questionAttempts = await this.questionAttemptRepository
       .createQueryBuilder('questionAttempt')
       .where('questionAttempt.questionSetAttemptId = :questionSetAttemptId', {
         questionSetAttemptId,
       })
       .getMany();
 
-    const correctCount = attempts.filter((a) => a.isCorrect).length;
-    // const total = attempts.length;
+    const hasManuallyCheckableQuestions = questionAttempts.some(
+      (questionAttempt) =>
+        questionAttempt.question.type === QuestionType.SHORT ||
+        questionAttempt.question.type === QuestionType.LONG,
+    );
+
+    const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
     const total = questionSetAttempt.questionSet.questions.length;
 
     questionSetAttempt.isCompleted = true;
@@ -657,6 +670,7 @@ export class QuestionSetAttemptService {
     questionSetAttempt.score = correctCount;
     questionSetAttempt.percentage =
       total > 0 ? (correctCount / total) * 100 : 0;
+    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : null;
 
     await this.questionSetAttemptsRepository.save(questionSetAttempt);
 
@@ -671,6 +685,168 @@ export class QuestionSetAttemptService {
     };
   }
 
+  async reviewAnswer(questionAttemptId: string, payload: ReviewAnswerDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // REPOSITORY INITIALIZATION
+      const questionSetAttemptRepo =
+        queryRunner.manager.getRepository(QuestionSetAttempt);
+      const questionAttemptRepo =
+        queryRunner.manager.getRepository(QuestionAttempt);
+      const questionStatRepo = queryRunner.manager.getRepository(QuestionStats);
+
+      const questionAttempt = await questionAttemptRepo
+        .createQueryBuilder('questionAttempt')
+        .leftJoinAndSelect(
+          'questionAttempt.questionSetAttempt',
+          'questionSetAttempt',
+        )
+        .leftJoinAndSelect('questionSetAttempt.question', 'question')
+        .leftJoinAndSelect('question.questionStats', 'questionStats')
+        .leftJoinAndSelect(
+          'questionAttempt.questionSetAttempt',
+          'questionSetAttempt',
+        )
+        .where('questionAttempt.id = :questionAttemptId', {
+          questionAttemptId: questionAttemptId,
+        })
+        .getOne();
+
+      if (!questionAttempt) {
+        throw new NotFoundException({
+          success: false,
+          message: 'Question attempt not found.',
+          data: null,
+        });
+      }
+
+      const previousIsCorrect = questionAttempt.isCorrect;
+      const question = questionAttempt.question;
+
+      if (
+        questionAttempt.question.type !== QuestionType.SHORT &&
+        questionAttempt.question.type !== QuestionType.LONG
+      ) {
+        throw new BadRequestException({
+          success: false,
+          message:
+            'Only short or long answer questions can be reviewed manually.',
+          data: null,
+        });
+      }
+
+      const questionStats = await questionStatRepo
+        .createQueryBuilder('questionStats')
+        .leftJoinAndSelect('questionStats.question', 'question')
+        .where('question.id = :questionId', { questionId: question.id })
+        .getOne();
+
+      // If review changed from incorrect to correct
+      if (!previousIsCorrect && payload.isCorrect) {
+        questionStats!.timesAnsweredCorrectly += 1;
+      }
+      // If review changed from correct to incorrect
+      else if (previousIsCorrect && !payload.isCorrect) {
+        questionStats!.timesAnsweredCorrectly -= 1;
+      }
+
+      // Save updated stats
+      await questionStatRepo.save(questionStats!);
+
+      // Save updated question attempt
+      questionAttempt.isCorrect = payload.isCorrect;
+      await questionAttemptRepo.save(questionAttempt);
+
+      // Recalculate score for questionSetAttempt
+      const questionSetAttempt = await questionSetAttemptRepo
+        .createQueryBuilder('questionSetAttempt')
+        .leftJoinAndSelect(
+          'questionSetAttempt.questionAttempts',
+          'questionAttempt',
+        )
+        .where('questionSetAttempt.id = :questionSetAttemptId', {
+          questionSetAttemptId: questionAttempt.questionSetAttemptId,
+        })
+        .getOne();
+
+      const allQuestionAttempts = questionSetAttempt?.questionAttempts;
+
+      const score = allQuestionAttempts!.filter((a) => a.isCorrect).length;
+      const total = questionSetAttempt!.questionSet.questions.length;
+      const percentage = total > 0 ? (score / total) * 100 : 0;
+      questionSetAttempt!.score = score;
+      questionSetAttempt!.percentage = percentage;
+      await questionSetAttemptRepo.save(questionSetAttempt!);
+      await queryRunner.commitTransaction();
+
+      return {
+        success: true,
+        message: 'Answer reviewed and stats updated successfully.',
+        data: {
+          questionAttemptId,
+          isCorrect: payload.isCorrect,
+        },
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to Review the answer.';
+      throw new BadRequestException({
+        success: false,
+        message: errorMessage,
+        data: null,
+      });
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async markIsChecked(questionSetAttemptId: string) {
+    const questionSetAttempt = await this.questionSetAttemptsRepository
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.questions', 'question')
+      .where('questionSetAttempt.id = :questionSetAttemptId', {
+        questionSetAttemptId: questionSetAttemptId,
+      })
+      .getOne();
+
+    if (!questionSetAttempt) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Question set attempt not found.',
+        data: null,
+      });
+    }
+
+    // Check if it has any short or long answer questions
+    const hasManualQuestions = questionSetAttempt.questionSet.questions.some(
+      (question) =>
+        question.type === QuestionType.SHORT ||
+        question.type === QuestionType.LONG,
+    );
+
+    if (!hasManualQuestions) {
+      throw new BadRequestException({
+        success: false,
+        message: 'This question set attempt does not require manual checking.',
+        data: null,
+      });
+    }
+
+    questionSetAttempt.isChecked = true;
+    await this.questionSetAttemptsRepository.save(questionSetAttempt);
+
+    return {
+      success: true,
+      message: 'Question set attempt marked as checked.',
+      data: { questionSetAttemptId },
+    };
+  }
+
+  //
   async completeQuiz(questionSetAttemptId: string, queryRunner?: QueryRunner) {
     const manager = queryRunner?.manager || this.dataSource.manager;
 
@@ -679,11 +855,10 @@ export class QuestionSetAttemptService {
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttept.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
+      .where('questionSetAttempt.id = :questionSetAttemptId', {
+        questionSetAttemptId: questionSetAttemptId,
+      })
       .getOne();
-    // .findOne({
-    //   where: { id: questionSetAttemptId },
-    //   relations: ['questionSet', 'questionSet.questions'],
-    // });
 
     if (!questionSetAttempt || questionSetAttempt.isCompleted) return;
 
@@ -697,15 +872,19 @@ export class QuestionSetAttemptService {
 
     const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
     const total = questionSetAttempt.questionSet.questions.length;
+
+    const hasManuallyCheckableQuestions =
+      questionSetAttempt.questionSet.questions.some(
+        (q) => q.type === QuestionType.SHORT || q.type === QuestionType.LONG,
+      );
+
     questionSetAttempt.isCompleted = true;
     questionSetAttempt.completedAt = new Date();
     questionSetAttempt.score = correctCount;
     questionSetAttempt.percentage =
       total > 0 ? (correctCount / total) * 100 : 0;
+    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : null;
+
     await manager.getRepository(QuestionSetAttempt).save(questionSetAttempt);
   }
-
-  // Background job to auto-complete expired quizzes
-  // @Cron(CronExpression.EVERY_MINUTE) // Run every minute
-  // @Cron('*/10 * * * * *') // Run 10 seconds
 }

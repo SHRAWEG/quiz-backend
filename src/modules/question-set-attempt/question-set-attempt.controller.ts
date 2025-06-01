@@ -12,7 +12,8 @@ import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
-import { AnswerQuestionDto } from './dto/question-attempt.dto';
+import { QuestionAttemptDto } from './dto/question-attempt.dto';
+import { ReviewAnswerDto } from './dto/review-answer.dto copy';
 import { QuestionSetAttemptService } from './question-set-attempt.service';
 
 @Controller('question-set-attempts')
@@ -72,7 +73,7 @@ export class QuestionSetAttemptController {
   @Post('/answer/:questionSetAttemptId')
   async answerQuestion(
     @Param('questionSetAttemptId') questionSetAttemptId: string,
-    @Body() body: AnswerQuestionDto,
+    @Body() body: QuestionAttemptDto,
   ) {
     return await this.questionSetAttemptService.answerQuestion(
       questionSetAttemptId,
@@ -81,10 +82,30 @@ export class QuestionSetAttemptController {
   }
 
   // Complete the quiz and get the result
-  @Put('/:questionSetAttemptId/finish')
+  @Put('finish/:questionSetAttemptId')
   async finishQuiz(
     @Param('questionSetAttemptId') questionSetAttemptId: string,
   ) {
     return this.questionSetAttemptService.finishQuiz(questionSetAttemptId);
+  }
+
+  // Review the Short/Long types questions answers
+  @Put('reviewAnswer/:questionAttemptId')
+  async reviewAnswer(
+    @Param('questionAttemptId') questionAttemptId: string,
+    @Body() payload: ReviewAnswerDto,
+  ) {
+    return this.questionSetAttemptService.reviewAnswer(
+      questionAttemptId,
+      payload,
+    );
+  }
+
+  // Mark question set attempt as checked after reviewing all the reviewable answers
+  @Put('markChecked/:questionSetAttemptId')
+  async markIsChecked(
+    @Param('questionSetAttemptId') questionSetAttemptId: string,
+  ) {
+    return this.questionSetAttemptService.markIsChecked(questionSetAttemptId);
   }
 }

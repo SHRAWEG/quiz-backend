@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
 
-export class AnswerQuestionDto {
+export class QuestionAttemptDto {
   @ApiPropertyOptional({
     description: 'UUID of the selected option (used for MCQ questions)',
     type: 'string',
