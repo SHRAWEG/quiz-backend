@@ -26,7 +26,6 @@ export class QuestionSetAttemptService {
     private readonly questionSetAttemptsRepository: Repository<QuestionSetAttempt>,
     @InjectRepository(QuestionAttempt)
     private readonly questionAttemptRepository: Repository<QuestionAttempt>,
-    @InjectRepository(QuestionSet)
     private readonly dataSource: DataSource,
     @Inject(REQUEST) private readonly request: Request,
   ) {}
