@@ -703,12 +703,8 @@ export class QuestionSetAttemptService {
           'questionAttempt.questionSetAttempt',
           'questionSetAttempt',
         )
-        .leftJoinAndSelect('questionSetAttempt.question', 'question')
+        .leftJoinAndSelect('questionAttempt.question', 'question')
         .leftJoinAndSelect('question.questionStats', 'questionStats')
-        .leftJoinAndSelect(
-          'questionAttempt.questionSetAttempt',
-          'questionSetAttempt',
-        )
         .where('questionAttempt.id = :questionAttemptId', {
           questionAttemptId: questionAttemptId,
         })
