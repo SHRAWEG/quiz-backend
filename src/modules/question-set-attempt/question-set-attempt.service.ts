@@ -631,7 +631,7 @@ export class QuestionSetAttemptService {
     const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
-      .leftJoinAndSelect('questionSet.questions', 'questions')
+      .leftJoinAndSelect('questionSet.questions', 'question')
       .where('questionSetAttempt.id = :questionSetAttemptId', {
         questionSetAttemptId,
       })
@@ -650,6 +650,7 @@ export class QuestionSetAttemptService {
 
     const questionAttempts = await this.questionAttemptRepository
       .createQueryBuilder('questionAttempt')
+      .leftJoinAndSelect('questionAttempt.question', 'question')
       .where('questionAttempt.questionSetAttemptId = :questionSetAttemptId', {
         questionSetAttemptId,
       })
