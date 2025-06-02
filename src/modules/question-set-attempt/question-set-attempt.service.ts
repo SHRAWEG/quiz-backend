@@ -26,8 +26,6 @@ export class QuestionSetAttemptService {
     private readonly questionSetAttemptsRepository: Repository<QuestionSetAttempt>,
     @InjectRepository(QuestionAttempt)
     private readonly questionAttemptRepository: Repository<QuestionAttempt>,
-    @InjectRepository(QuestionSet)
-    private readonly questionSetRepository: Repository<QuestionSet>,
     private readonly dataSource: DataSource,
     @Inject(REQUEST) private readonly request: Request,
   ) {}
@@ -776,7 +774,7 @@ export class QuestionSetAttemptService {
     const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
-      .leftJoinAndSelect('questionSet.questions', 'questions')
+      .leftJoinAndSelect('questionSet.questions', 'question')
       .where('questionSetAttempt.id = :questionSetAttemptId', {
         questionSetAttemptId,
       })
