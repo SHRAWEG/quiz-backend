@@ -44,7 +44,7 @@ export class QuestionSetAttemptController {
   async getQuestionSetAttempt(
     @Param('questionSetAttemptId') questionSetAttemptId: string,
   ) {
-    return await this.questionSetAttemptService.getQuestionSetAttempt(
+    return await this.questionSetAttemptService.getQuestionSetAttemptById(
       questionSetAttemptId,
     );
   }
@@ -54,7 +54,7 @@ export class QuestionSetAttemptController {
   async getQuestionSetAttemptReport(
     @Param('questionSetAttemptId') questionSetAttemptId: string,
   ) {
-    return await this.questionSetAttemptService.getQuestionSetAttemptReport(
+    return await this.questionSetAttemptService.getQuestionSetAttemptReportById(
       questionSetAttemptId,
     );
   }
@@ -64,7 +64,7 @@ export class QuestionSetAttemptController {
   async getQuestionSetAttemptStatus(
     @Param('questionSetAttemptId') questionSetAttemptId: string,
   ) {
-    return await this.questionSetAttemptService.getQuestionSetAttemptStatus(
+    return await this.questionSetAttemptService.getQuestionSetAttemptStatusById(
       questionSetAttemptId,
     );
   }

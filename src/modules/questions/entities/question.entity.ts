@@ -107,9 +107,6 @@ export class Question {
   @ManyToMany(() => QuestionSet, (questionSet) => questionSet.questions)
   questionSets: QuestionSet[];
 
-  @OneToOne(() => QuestionStats, (questionStats) => questionStats.question, {
-    cascade: true,
-  })
-  @JoinColumn({ name: 'id', referencedColumnName: 'questionId' })
+  @OneToOne(() => QuestionStats, (questionStats) => questionStats.question)
   questionStats: QuestionStats;
 }

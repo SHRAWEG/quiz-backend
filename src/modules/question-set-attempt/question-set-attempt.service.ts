@@ -162,7 +162,7 @@ export class QuestionSetAttemptService {
     };
   }
 
-  async getQuestionSetAttempt(questionSetAttemptId: string) {
+  async getQuestionSetAttemptById(questionSetAttemptId: string) {
     const user = this.request.user;
 
     const questionSetAttempt = await this.questionSetAttemptsRepository
@@ -267,7 +267,7 @@ export class QuestionSetAttemptService {
     };
   }
 
-  async getQuestionSetAttemptReport(questionSetAttemptId: string) {
+  async getQuestionSetAttemptReportById(questionSetAttemptId: string) {
     const user = this.request.user;
 
     const questionSetAttempt = await this.questionSetAttemptsRepository
@@ -391,7 +391,7 @@ export class QuestionSetAttemptService {
     };
   }
 
-  async getQuestionSetAttemptStatus(questionSetAttemptId: string) {
+  async getQuestionSetAttemptStatusById(questionSetAttemptId: string) {
     const user = this.request.user;
     const now = new Date();
 
