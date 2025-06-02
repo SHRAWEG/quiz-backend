@@ -905,6 +905,8 @@ export class QuestionSetAttemptService {
           'questionSetAttempt.questionAttempts',
           'questionAttempt',
         )
+        .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+        .leftJoinAndSelect('questionSet.questions', 'question')
         .where('questionSetAttempt.id = :questionSetAttemptId', {
           questionSetAttemptId: questionAttempt.questionSetAttemptId,
         })
@@ -929,6 +931,7 @@ export class QuestionSetAttemptService {
         },
       };
     } catch (error) {
+      console.log(error);
       await queryRunner.rollbackTransaction();
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to Review the answer.';
