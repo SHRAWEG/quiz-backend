@@ -36,6 +36,7 @@ export class CronTaskService {
     const questionAttempts = await manager
       .getRepository(QuestionAttempt)
       .createQueryBuilder('questionAttempt')
+      .leftJoinAndSelect('questionAttempt.question', 'question')
       .where('questionAttempt.questionSetAttemptId = :questionSetAttemptId', {
         questionSetAttemptId: questionSetAttemptId,
       })

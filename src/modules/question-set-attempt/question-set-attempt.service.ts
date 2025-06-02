@@ -655,7 +655,7 @@ export class QuestionSetAttemptService {
       }
 
       let isCorrect: boolean | null = false;
-      let isChecked: boolean | null = false;
+      let isChecked: boolean | null = true;
       if (question.type === QuestionType.MCQ && payload.selectedOptionId) {
         const selectedOption =
           question.options &&
