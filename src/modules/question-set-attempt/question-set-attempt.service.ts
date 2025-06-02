@@ -429,7 +429,7 @@ export class QuestionSetAttemptService {
       // .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
       //   isCompleted: true,
       // })
-      .orderBy('questionAttempt.createdAt', 'ASC')
+      .orderBy('questionAttempt.id', 'ASC')
       .getOne();
 
     if (!questionSetAttempt) {
@@ -813,7 +813,7 @@ export class QuestionSetAttemptService {
     questionSetAttempt.score = correctCount;
     questionSetAttempt.percentage =
       total > 0 ? (correctCount / total) * 100 : 0;
-    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : null;
+    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : true;
 
     await this.questionSetAttemptsRepository.save(questionSetAttempt);
 
@@ -995,7 +995,7 @@ export class QuestionSetAttemptService {
     const questionSetAttempt = await manager
       .getRepository(QuestionSetAttempt)
       .createQueryBuilder('questionSetAttempt')
-      .leftJoinAndSelect('questionSetAttept.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
       .where('questionSetAttempt.id = :questionSetAttemptId', {
         questionSetAttemptId: questionSetAttemptId,

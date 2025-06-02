@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { QuestionType } from 'src/common/enums/question.enum';
 import { DataSource, QueryRunner } from 'typeorm';
 import { QuestionAttempt } from '../question-attempt/entities/question-attempt.entity';
 import { QuestionSetAttempt } from '../question-set-attempt/entities/question-set-attempt.entity';
@@ -40,6 +41,12 @@ export class CronTaskService {
       })
       .getMany();
 
+    const hasManuallyCheckableQuestions = questionAttempts.some(
+      (questionAttempt) =>
+        questionAttempt.question.type === QuestionType.SHORT ||
+        questionAttempt.question.type === QuestionType.LONG,
+    );
+
     const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
     const total = questionSetAttempt.questionSet.questions.length;
     questionSetAttempt.isCompleted = true;
@@ -47,6 +54,8 @@ export class CronTaskService {
     questionSetAttempt.score = correctCount;
     questionSetAttempt.percentage =
       total > 0 ? (correctCount / total) * 100 : 0;
+    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : true;
+
     await manager.getRepository(QuestionSetAttempt).save(questionSetAttempt);
   }
 
