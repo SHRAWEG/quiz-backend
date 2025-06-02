@@ -27,6 +27,7 @@ export class QuestionSetAttemptService {
     @InjectRepository(QuestionAttempt)
     private readonly questionAttemptRepository: Repository<QuestionAttempt>,
     @InjectRepository(QuestionSet)
+    private readonly questionSetRepository: Repository<QuestionSet>,
     private readonly dataSource: DataSource,
     @Inject(REQUEST) private readonly request: Request,
   ) {}
@@ -153,11 +154,33 @@ export class QuestionSetAttemptService {
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
       .where('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      .orderBy('questionSetAttempt.completedAt', 'DESC')
       .getMany();
 
     return {
       success: true,
       message: 'Question attempts fetched successful.',
+      data: questionSetAttempts,
+    };
+  }
+
+  async getQuestionSetAttemptsToReview() {
+    const questionSetAttempts = await this.questionSetAttemptsRepository
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.category', 'category')
+      .andWhere('questionSetAttempt.isChecked = :isChecked', {
+        isChecked: false,
+      })
+      .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+        isCompleted: true,
+      })
+      .orderBy('questionSetAttempt.completedAt', 'DESC')
+      .getMany();
+
+    return {
+      success: true,
+      message: 'Question attempts to review fetched successfully.',
       data: questionSetAttempts,
     };
   }
@@ -284,6 +307,127 @@ export class QuestionSetAttemptService {
       .leftJoinAndSelect('question.subSubject', 'subSubject')
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
       .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      // .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+      //   isCompleted: true,
+      // })
+      .orderBy('questionAttempt.createdAt', 'ASC')
+      .getOne();
+
+    if (!questionSetAttempt) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Question Set attempt not found.',
+        data: null,
+      });
+    }
+    if (!questionSetAttempt.isCompleted) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Question Set attempt is not completed yet.',
+        data: null,
+      });
+    }
+
+    // const questionAttempts = questionSetAttempt.questionAttempts.map(
+    //   (attempt) => {
+    //     const { question } = attempt;
+
+    //     const selectedAnswer =
+    //       attempt.selectedOptionId ??
+    //       attempt.selectedBooleanAnswer ??
+    //       attempt.selectedTextAnswer ??
+    //       null;
+
+    //     // We use stored `isCorrect` and pull correct answer from question
+    //     let correctAnswer: string | boolean | null = null;
+
+    //     switch (question.type) {
+    //       case QuestionType.MCQ:
+    //         correctAnswer =
+    //           question.options?.find((opt) => opt.isCorrect)?.id ?? null;
+    //         break;
+    //       case QuestionType.TRUE_OR_FALSE:
+    //         correctAnswer =
+    //           typeof question.correctAnswerBoolean == 'boolean'
+    //             ? question.correctAnswerBoolean
+    //             : null;
+    //         break;
+    //       case QuestionType.FILL_IN_THE_BLANKS:
+    //         correctAnswer =
+    //           typeof question.correctAnswerText == 'string'
+    //             ? question.correctAnswerText
+    //             : null;
+    //         break;
+    //     }
+
+    //     return {
+    //       id: attempt.id,
+    //       selectedAnswer,
+    //       isCorrect: attempt.isCorrect,
+    //       question: {
+    //         id: question.id,
+    //         question: question.questionText,
+    //         type: question.type,
+    //         difficulty: question.difficulty,
+    //         subject: {
+    //           id: question.subject?.id,
+    //           name: question.subject?.name,
+    //         },
+    //         subSubject: {
+    //           id: question.subSubject?.id,
+    //           name: question.subSubject?.name,
+    //         },
+    //         options: question.options?.map((opt) => ({
+    //           id: opt.id,
+    //           option: opt.option_text,
+    //           isCorrect: opt.isCorrect,
+    //         })),
+    //         correctAnswer,
+    //       },
+    //     };
+    //   },
+    // );
+
+    // const attemptedQuestionsCount = questionAttempts.filter(
+    //   (a) => a.selectedAnswer !== null,
+    // ).length;
+
+    // const report = {
+    //   id: questionSetAttempt.id,
+    //   questionSetId: questionSetAttempt.questionSet.id,
+    //   startedAt: questionSetAttempt.startedAt,
+    //   completedAt: questionSetAttempt.completedAt,
+    //   isCompleted: questionSetAttempt.isCompleted,
+    //   score: questionSetAttempt.score,
+    //   percentage: questionSetAttempt.percentage,
+    //   questionSetName: questionSetAttempt.questionSet.name,
+    //   questionSetCategory: questionSetAttempt.questionSet.category,
+    //   questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
+    //   attemptedQuestionsCount,
+    //   questionAttempts,
+    // };
+
+    return {
+      success: true,
+      message: 'Question set report generated successfully.',
+      data: questionSetAttempt,
+    };
+  }
+
+  async getQuestionSetAttemptToReviewById(questionSetAttemptId: string) {
+    const questionSetAttempt = await this.questionSetAttemptsRepository
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.category', 'category')
+      .leftJoinAndSelect(
+        'questionSetAttempt.questionAttempts',
+        'questionAttempt',
+      )
+      .leftJoinAndSelect('questionAttempt.question', 'question')
+      .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.subSubject', 'subSubject')
+      .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
       // .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
       //   isCompleted: true,
       // })
@@ -651,6 +795,7 @@ export class QuestionSetAttemptService {
 
     const questionAttempts = await this.questionAttemptRepository
       .createQueryBuilder('questionAttempt')
+      .leftJoinAndSelect('questionAttempt.question', 'question')
       .where('questionAttempt.questionSetAttemptId = :questionSetAttemptId', {
         questionSetAttemptId,
       })
@@ -703,12 +848,8 @@ export class QuestionSetAttemptService {
           'questionAttempt.questionSetAttempt',
           'questionSetAttempt',
         )
-        .leftJoinAndSelect('questionSetAttempt.question', 'question')
+        .leftJoinAndSelect('questionAttempt.question', 'question')
         .leftJoinAndSelect('question.questionStats', 'questionStats')
-        .leftJoinAndSelect(
-          'questionAttempt.questionSetAttempt',
-          'questionSetAttempt',
-        )
         .where('questionAttempt.id = :questionAttemptId', {
           questionAttemptId: questionAttemptId,
         })

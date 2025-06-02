@@ -39,6 +39,23 @@ export class QuestionSetAttemptController {
     return await this.questionSetAttemptService.getQuestionSetAttempts();
   }
 
+  @Roles(Role.ADMIN)
+  // Get Question set Attempt Details.
+  @Get('review')
+  async getQuestionSetAttemptsToReview() {
+    return await this.questionSetAttemptService.getQuestionSetAttemptsToReview();
+  }
+
+  @Roles(Role.ADMIN)
+  @Get('review/:questionSetAttemptId')
+  async getQuestionSetAttemptToReview(
+    @Param('questionSetAttemptId') questionSetAttemptId: string,
+  ) {
+    return await this.questionSetAttemptService.getQuestionSetAttemptToReviewById(
+      questionSetAttemptId,
+    );
+  }
+
   // Get Question set Attempt Details.
   @Get('/:questionSetAttemptId')
   async getQuestionSetAttempt(
@@ -90,6 +107,7 @@ export class QuestionSetAttemptController {
   }
 
   // Review the Short/Long types questions answers
+  @Roles(Role.ADMIN)
   @Put('reviewAnswer/:questionAttemptId')
   async reviewAnswer(
     @Param('questionAttemptId') questionAttemptId: string,
@@ -101,6 +119,7 @@ export class QuestionSetAttemptController {
     );
   }
 
+  @Roles(Role.ADMIN)
   // Mark question set attempt as checked after reviewing all the reviewable answers
   @Put('markChecked/:questionSetAttemptId')
   async markIsChecked(
