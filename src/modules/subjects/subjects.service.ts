@@ -43,6 +43,7 @@ export class SubjectsService {
     const skip = (page - 1) * limit;
     const queryBuilder = this.subjectRepository
       .createQueryBuilder('subject')
+      .orderBy('subject.id', 'DESC')
       .skip(skip)
       .take(limit);
 
