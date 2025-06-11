@@ -30,12 +30,17 @@ export class QuestionSetAttemptService {
     @Inject(REQUEST) private readonly request: Request,
   ) {}
 
+  // PERMISSION : STUDENT
+  /*
+    SERVICES FROM HERE ARE FOR STUDENTS ONLY
+  */
   async startQuestionSetAttempt(questionSetId: string) {
     const user = this.request.user;
     // INITIALIZING AND STARTING THE DB TRANSACTION
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     try {
       // REPOSITORY INITIALIZATION
       const questionSetRepo = queryRunner.manager.getRepository(QuestionSet);
@@ -65,6 +70,17 @@ export class QuestionSetAttemptService {
         });
       }
 
+      const existingAttemptsCount = await questionSetAttemptRepo
+        .createQueryBuilder('questionSetAttempt')
+        .where('questionSetAttempt.userId = :userId', { userId: user?.sub })
+        .andWhere('questionSetAttempt.questionSetId = :questionSetId', {
+          questionSetId: questionSet.id,
+        })
+        .getCount();
+
+      // Determine the new attempt number
+      const newAttemptNumber = existingAttemptsCount + 1;
+
       const now = new Date();
       const expiryAt =
         questionSet.isTimeLimited && questionSet.timeLimitSeconds
@@ -77,6 +93,7 @@ export class QuestionSetAttemptService {
         isCompleted: false,
         startedAt: now,
         expiryAt: expiryAt,
+        attemptNumber: newAttemptNumber,
       });
       const questionSetAttempt = await questionSetAttemptRepo.save(
         questionSetAttemptPayload,
@@ -114,11 +131,6 @@ export class QuestionSetAttemptService {
 
       await queryRunner.commitTransaction();
 
-      // const remainingTimeSeconds =
-      //   questionSet.isTimeLimited && expiryAt
-      //     ? Math.max(0, Math.floor((expiryAt.getTime() - now.getTime()) / 1000))
-      //     : null;
-
       return {
         success: true,
         message: 'Quiz started, Best of luck student.',
@@ -145,6 +157,7 @@ export class QuestionSetAttemptService {
     }
   }
 
+  // Question Set Attempts per student
   async getQuestionSetAttempts() {
     const user = this.request.user;
     const questionSetAttempts = await this.questionSetAttemptsRepository
@@ -162,41 +175,18 @@ export class QuestionSetAttemptService {
     };
   }
 
-  // ACCESS : ADMIN
-  async getQuestionSetAttemptsToReview() {
-    const questionSetAttempts = await this.questionSetAttemptsRepository
+  // Question Set Attempt for student
+  async getQuestionSetAttemptById(questionSetAttemptId: string) {
+    const user = this.request.user;
+    const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
-      .andWhere('questionSetAttempt.isChecked = :isChecked', {
-        isChecked: false,
-      })
-      .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
-        isCompleted: true,
-      })
-      .orderBy('questionSetAttempt.completedAt', 'DESC')
-      .getMany();
-
-    return {
-      success: true,
-      message: 'Question attempts to review fetched successfully.',
-      data: questionSetAttempts,
-    };
-  }
-
-  async getQuestionSetAttemptById(questionSetAttemptId: string) {
-    const user = this.request.user;
-
-    const questionSetAttempt = await this.questionSetAttemptsRepository
-      .createQueryBuilder('questionSetAttempt')
-      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet') // include all fields
-      .leftJoinAndSelect('questionSet.category', 'category') // include all fields
       .leftJoin('questionSetAttempt.questionAttempts', 'questionAttempt')
-      .leftJoin('questionAttempt.question', 'question') // don't select all fields
-      .leftJoin('question.options', 'option') // don't select all fields
-      .leftJoinAndSelect('question.subject', 'subject') // include all fields
-      .leftJoinAndSelect('question.subSubject', 'subSubject') // include all fields
-      // Select specific fields from `questionAttempt`
+      .leftJoin('questionAttempt.question', 'question')
+      .leftJoin('question.options', 'option')
+      .leftJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.subSubject', 'subSubject')
       .addSelect([
         'questionAttempt.id',
         'questionAttempt.selectedTextAnswer',
@@ -206,7 +196,6 @@ export class QuestionSetAttemptService {
         'questionAttempt.createdAt',
         'questionAttempt.updatedAt',
       ])
-      // Select specific fields from `question`
       .addSelect([
         'question.id',
         'question.questionText',
@@ -217,7 +206,6 @@ export class QuestionSetAttemptService {
         'question.createdAt',
         'question.updatedAt',
       ])
-      // Select specific fields from `option`
       .addSelect(['option.id', 'option.optionText'])
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
       .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
@@ -231,57 +219,6 @@ export class QuestionSetAttemptService {
         data: null,
       });
     }
-
-    // const formattedAttempts = questionSetAttempt.questionAttempts.map(
-    //   (attempt) => ({
-    //     id: attempt.id,
-    //     selectedAnswer:
-    //       attempt.selectedOptionId ??
-    //       attempt.selectedBooleanAnswer ??
-    //       attempt.selectedTextAnswer ??
-    //       null,
-    //     question: {
-    //       id: attempt.question.id,
-    //       question: attempt.question.questionText,
-    //       type: attempt.question.type,
-    //       difficulty: attempt.question.difficulty,
-    //       subject: {
-    //         id: attempt.question.subject?.id,
-    //         name: attempt.question.subject?.name,
-    //       },
-    //       subSubject: {
-    //         id: attempt.question.subSubject?.id,
-    //         name: attempt.question.subSubject?.name,
-    //       },
-    //       options: attempt.question.options?.map((opt) => ({
-    //         id: opt.id,
-    //         option: opt.option_text,
-    //       })),
-    //     },
-    //   }),
-    // );
-
-    // const attemptedQuestionsCount = questionSetAttempt.questionAttempts.filter(
-    //   (a) =>
-    //     (a.selectedOptionId !== null && a.selectedOptionId !== undefined) ||
-    //     (a.selectedBooleanAnswer !== null &&
-    //       a.selectedBooleanAnswer !== undefined) ||
-    //     (a.selectedTextAnswer && a.selectedTextAnswer.trim() !== ''),
-    // ).length;
-
-    // const formatted = {
-    //   id: questionSetAttempt.id,
-    //   questionSetId: questionSetAttempt.questionSet.id,
-    //   startedAt: questionSetAttempt.startedAt,
-    //   completedAt: questionSetAttempt.completedAt,
-    //   isCompleted: questionSetAttempt.isCompleted,
-    //   questionSetName: questionSetAttempt.questionSet.name,
-    //   questionSetCategory: questionSetAttempt.questionSet.category,
-    //   questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
-    //   attemptedQuestionsCount,
-    //   questionAttepts: formattedAttempts,
-    // };
-
     return {
       success: true,
       message: 'Question set fetch successful.',
@@ -289,9 +226,9 @@ export class QuestionSetAttemptService {
     };
   }
 
+  // Report of the completed question set attempt
   async getQuestionSetAttemptReportById(questionSetAttemptId: string) {
     const user = this.request.user;
-
     const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
@@ -306,9 +243,6 @@ export class QuestionSetAttemptService {
       .leftJoinAndSelect('question.subSubject', 'subSubject')
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
       .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
-      // .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
-      //   isCompleted: true,
-      // })
       .orderBy('questionAttempt.createdAt', 'ASC')
       .getOne();
 
@@ -319,6 +253,7 @@ export class QuestionSetAttemptService {
         data: null,
       });
     }
+
     if (!questionSetAttempt.isCompleted) {
       throw new NotFoundException({
         success: false,
@@ -327,213 +262,87 @@ export class QuestionSetAttemptService {
       });
     }
 
-    // const questionAttempts = questionSetAttempt.questionAttempts.map(
-    //   (attempt) => {
-    //     const { question } = attempt;
+    if (!questionSetAttempt.questionSet || !questionSetAttempt.questionSet.id) {
+      throw new Error('QuestionSet ID not found for the attempt.'); // Or a more specific error
+    }
 
-    //     const selectedAnswer =
-    //       attempt.selectedOptionId ??
-    //       attempt.selectedBooleanAnswer ??
-    //       attempt.selectedTextAnswer ??
-    //       null;
+    const currentAttemptScore = questionSetAttempt.score;
 
-    //     // We use stored `isCorrect` and pull correct answer from question
-    //     let correctAnswer: string | boolean | null = null;
-
-    //     switch (question.type) {
-    //       case QuestionType.MCQ:
-    //         correctAnswer =
-    //           question.options?.find((opt) => opt.isCorrect)?.id ?? null;
-    //         break;
-    //       case QuestionType.TRUE_OR_FALSE:
-    //         correctAnswer =
-    //           typeof question.correctAnswerBoolean == 'boolean'
-    //             ? question.correctAnswerBoolean
-    //             : null;
-    //         break;
-    //       case QuestionType.FILL_IN_THE_BLANKS:
-    //         correctAnswer =
-    //           typeof question.correctAnswerText == 'string'
-    //             ? question.correctAnswerText
-    //             : null;
-    //         break;
-    //     }
-
-    //     return {
-    //       id: attempt.id,
-    //       selectedAnswer,
-    //       isCorrect: attempt.isCorrect,
-    //       question: {
-    //         id: question.id,
-    //         question: question.questionText,
-    //         type: question.type,
-    //         difficulty: question.difficulty,
-    //         subject: {
-    //           id: question.subject?.id,
-    //           name: question.subject?.name,
-    //         },
-    //         subSubject: {
-    //           id: question.subSubject?.id,
-    //           name: question.subSubject?.name,
-    //         },
-    //         options: question.options?.map((opt) => ({
-    //           id: opt.id,
-    //           option: opt.option_text,
-    //           isCorrect: opt.isCorrect,
-    //         })),
-    //         correctAnswer,
-    //       },
-    //     };
-    //   },
-    // );
-
-    // const attemptedQuestionsCount = questionAttempts.filter(
-    //   (a) => a.selectedAnswer !== null,
-    // ).length;
-
-    // const report = {
-    //   id: questionSetAttempt.id,
-    //   questionSetId: questionSetAttempt.questionSet.id,
-    //   startedAt: questionSetAttempt.startedAt,
-    //   completedAt: questionSetAttempt.completedAt,
-    //   isCompleted: questionSetAttempt.isCompleted,
-    //   score: questionSetAttempt.score,
-    //   percentage: questionSetAttempt.percentage,
-    //   questionSetName: questionSetAttempt.questionSet.name,
-    //   questionSetCategory: questionSetAttempt.questionSet.category,
-    //   questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
-    //   attemptedQuestionsCount,
-    //   questionAttempts,
-    // };
-
-    return {
-      success: true,
-      message: 'Question set report generated successfully.',
-      data: questionSetAttempt,
-    };
-  }
-
-  async getQuestionSetAttemptToReviewById(questionSetAttemptId: string) {
-    const questionSetAttempt = await this.questionSetAttemptsRepository
+    // 2. Fetch all completed attempts for this specific questionSetId
+    const allCompletedAttemptsForSet = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
-      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
-      .leftJoinAndSelect('questionSet.category', 'category')
-      .leftJoinAndSelect(
-        'questionSetAttempt.questionAttempts',
-        'questionAttempt',
-      )
-      .leftJoinAndSelect('questionAttempt.question', 'question')
-      .leftJoinAndSelect('question.options', 'option')
-      .leftJoinAndSelect('question.subject', 'subject')
-      .leftJoinAndSelect('question.subSubject', 'subSubject')
-      .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
-      // .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
-      //   isCompleted: true,
-      // })
-      .orderBy('questionAttempt.id', 'ASC')
-      .getOne();
+      .select(['questionSetAttempt.score', 'questionSetAttempt.userId']) // Only select score and userId
+      .where('questionSetAttempt.questionSetId = :questionSetId', {
+        questionSetId: questionSetAttempt.questionSet.id,
+      })
+      .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+        isCompleted: true,
+      })
+      .getMany();
 
-    if (!questionSetAttempt) {
-      throw new NotFoundException({
-        success: false,
-        message: 'Question Set attempt not found.',
-        data: null,
-      });
+    // 3. Process the fetched attempts to get aggregate statistics
+
+    let highestOverallScore = 0;
+    let lowestOverallScore = Infinity; // Initialize with a very large number
+    let totalOverallScore = 0;
+    let overallAttemptCount = 0;
+
+    let userHighestScore = 0;
+    let userLowestScore = Infinity;
+    let userTotalScore = 0;
+    let userAttemptCount = 0;
+
+    for (const attempt of allCompletedAttemptsForSet) {
+      const score = attempt.score; // Assuming 'score' field exists
+
+      if (score > highestOverallScore) {
+        highestOverallScore = score;
+      }
+      if (score < lowestOverallScore) {
+        lowestOverallScore = score;
+      }
+      totalOverallScore += score;
+      overallAttemptCount++;
+
+      if (attempt.userId === user?.sub) {
+        if (score > userHighestScore) {
+          userHighestScore = score;
+        }
+        if (score < userLowestScore) {
+          userLowestScore = score;
+        }
+        userTotalScore += score;
+        userAttemptCount++;
+      }
     }
-    if (!questionSetAttempt.isCompleted) {
-      throw new NotFoundException({
-        success: false,
-        message: 'Question Set attempt is not completed yet.',
-        data: null,
-      });
-    }
 
-    // const questionAttempts = questionSetAttempt.questionAttempts.map(
-    //   (attempt) => {
-    //     const { question } = attempt;
-
-    //     const selectedAnswer =
-    //       attempt.selectedOptionId ??
-    //       attempt.selectedBooleanAnswer ??
-    //       attempt.selectedTextAnswer ??
-    //       null;
-
-    //     // We use stored `isCorrect` and pull correct answer from question
-    //     let correctAnswer: string | boolean | null = null;
-
-    //     switch (question.type) {
-    //       case QuestionType.MCQ:
-    //         correctAnswer =
-    //           question.options?.find((opt) => opt.isCorrect)?.id ?? null;
-    //         break;
-    //       case QuestionType.TRUE_OR_FALSE:
-    //         correctAnswer =
-    //           typeof question.correctAnswerBoolean == 'boolean'
-    //             ? question.correctAnswerBoolean
-    //             : null;
-    //         break;
-    //       case QuestionType.FILL_IN_THE_BLANKS:
-    //         correctAnswer =
-    //           typeof question.correctAnswerText == 'string'
-    //             ? question.correctAnswerText
-    //             : null;
-    //         break;
-    //     }
-
-    //     return {
-    //       id: attempt.id,
-    //       selectedAnswer,
-    //       isCorrect: attempt.isCorrect,
-    //       question: {
-    //         id: question.id,
-    //         question: question.questionText,
-    //         type: question.type,
-    //         difficulty: question.difficulty,
-    //         subject: {
-    //           id: question.subject?.id,
-    //           name: question.subject?.name,
-    //         },
-    //         subSubject: {
-    //           id: question.subSubject?.id,
-    //           name: question.subSubject?.name,
-    //         },
-    //         options: question.options?.map((opt) => ({
-    //           id: opt.id,
-    //           option: opt.option_text,
-    //           isCorrect: opt.isCorrect,
-    //         })),
-    //         correctAnswer,
-    //       },
-    //     };
-    //   },
-    // );
-
-    // const attemptedQuestionsCount = questionAttempts.filter(
-    //   (a) => a.selectedAnswer !== null,
-    // ).length;
-
-    // const report = {
-    //   id: questionSetAttempt.id,
-    //   questionSetId: questionSetAttempt.questionSet.id,
-    //   startedAt: questionSetAttempt.startedAt,
-    //   completedAt: questionSetAttempt.completedAt,
-    //   isCompleted: questionSetAttempt.isCompleted,
-    //   score: questionSetAttempt.score,
-    //   percentage: questionSetAttempt.percentage,
-    //   questionSetName: questionSetAttempt.questionSet.name,
-    //   questionSetCategory: questionSetAttempt.questionSet.category,
-    //   questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
-    //   attemptedQuestionsCount,
-    //   questionAttempts,
-    // };
+    const overallAverageScore =
+      overallAttemptCount > 0 ? totalOverallScore / overallAttemptCount : 0;
+    const userAverageScore =
+      userAttemptCount > 0 ? userTotalScore / userAttemptCount : 0;
 
     return {
       success: true,
       message: 'Question set report generated successfully.',
-      data: questionSetAttempt,
+      data: {
+        ...questionSetAttempt, // Include all existing details of the current attempt
+        reportStatistics: {
+          currentAttemptScore: currentAttemptScore,
+          // Overall statistics
+          highestOverallScore: highestOverallScore,
+          lowestOverallScore: overallAttemptCount > 0 ? lowestOverallScore : 0, // Set to 0 if no attempts
+          overallAverageScore: overallAverageScore,
+
+          // User-specific statistics for this question set
+          userHighestScore: userHighestScore,
+          userLowestScore: userAttemptCount > 0 ? userLowestScore : 0, // Set to 0 if no user attempts
+          userAverageScore: userAverageScore,
+        },
+      },
     };
   }
 
+  // Status of an question set attempt, remaining time and completed status
   async getQuestionSetAttemptStatusById(questionSetAttemptId: string) {
     const user = this.request.user;
     const now = new Date();
@@ -564,7 +373,6 @@ export class QuestionSetAttemptService {
       questionSetAttempt.expiryAt && now > questionSetAttempt.expiryAt;
 
     if (isExpired && !questionSetAttempt.isCompleted) {
-      // Auto-complete if expired
       await this.completeQuiz(questionSetAttemptId);
       questionSetAttempt.isCompleted = true;
     }
@@ -584,6 +392,7 @@ export class QuestionSetAttemptService {
     };
   }
 
+  // Service to answer questions for Students
   async answerQuestion(
     questionSetAttemptId: string,
     payload: QuestionAttemptDto,
@@ -770,6 +579,7 @@ export class QuestionSetAttemptService {
     }
   }
 
+  // Service to mark the question set attempt as completed
   async finishQuiz(questionSetAttemptId: string) {
     const user = this.request.user;
     const questionSetAttempt = await this.questionSetAttemptsRepository
@@ -829,6 +639,197 @@ export class QuestionSetAttemptService {
     };
   }
 
+  // Service to complete the quiz automatically if time ends ( Called in getQuestionSetAttemptStatusById service)
+  async completeQuiz(questionSetAttemptId: string, queryRunner?: QueryRunner) {
+    const manager = queryRunner?.manager || this.dataSource.manager;
+
+    const questionSetAttempt = await manager
+      .getRepository(QuestionSetAttempt)
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.questions', 'question')
+      .where('questionSetAttempt.id = :questionSetAttemptId', {
+        questionSetAttemptId: questionSetAttemptId,
+      })
+      .getOne();
+
+    if (!questionSetAttempt || questionSetAttempt.isCompleted) return;
+
+    const questionAttempts = await manager
+      .getRepository(QuestionAttempt)
+      .createQueryBuilder('questionAttempt')
+      .where('questionAttempt.questionSetAttemptId = :questionSetAttemptId', {
+        questionSetAttemptId: questionSetAttemptId,
+      })
+      .getMany();
+
+    const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
+    const total = questionSetAttempt.questionSet.questions.length;
+
+    const hasManuallyCheckableQuestions =
+      questionSetAttempt.questionSet.questions.some(
+        (q) => q.type === QuestionType.SHORT || q.type === QuestionType.LONG,
+      );
+
+    questionSetAttempt.isCompleted = true;
+    questionSetAttempt.completedAt = new Date();
+    questionSetAttempt.score = correctCount;
+    questionSetAttempt.percentage =
+      total > 0 ? (correctCount / total) * 100 : 0;
+    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : null;
+
+    await manager.getRepository(QuestionSetAttempt).save(questionSetAttempt);
+  }
+
+  // PERMISSION : ADMIN
+  /*
+    SERVICES FROM HERE ARE FOR ADMINS ONLY
+  */
+  // List of all the completed but unchecked question set attempts
+  async getQuestionSetAttemptsToReview() {
+    const questionSetAttempts = await this.questionSetAttemptsRepository
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.category', 'category')
+      .andWhere('questionSetAttempt.isChecked = :isChecked', {
+        isChecked: false,
+      })
+      .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+        isCompleted: true,
+      })
+      .orderBy('questionSetAttempt.completedAt', 'DESC')
+      .getMany();
+
+    return {
+      success: true,
+      message: 'Question attempts to review fetched successfully.',
+      data: questionSetAttempts,
+    };
+  }
+
+  // Question set attempt to review (To check/ review answers in the question sets that are long or short typed)
+  async getQuestionSetAttemptToReviewById(questionSetAttemptId: string) {
+    const questionSetAttempt = await this.questionSetAttemptsRepository
+      .createQueryBuilder('questionSetAttempt')
+      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
+      .leftJoinAndSelect('questionSet.category', 'category')
+      .leftJoinAndSelect(
+        'questionSetAttempt.questionAttempts',
+        'questionAttempt',
+      )
+      .leftJoinAndSelect('questionAttempt.question', 'question')
+      .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.subSubject', 'subSubject')
+      .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
+      // .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+      //   isCompleted: true,
+      // })
+      .orderBy('questionAttempt.id', 'ASC')
+      .getOne();
+
+    if (!questionSetAttempt) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Question Set attempt not found.',
+        data: null,
+      });
+    }
+    if (!questionSetAttempt.isCompleted) {
+      throw new NotFoundException({
+        success: false,
+        message: 'Question Set attempt is not completed yet.',
+        data: null,
+      });
+    }
+
+    // const questionAttempts = questionSetAttempt.questionAttempts.map(
+    //   (attempt) => {
+    //     const { question } = attempt;
+
+    //     const selectedAnswer =
+    //       attempt.selectedOptionId ??
+    //       attempt.selectedBooleanAnswer ??
+    //       attempt.selectedTextAnswer ??
+    //       null;
+
+    //     // We use stored `isCorrect` and pull correct answer from question
+    //     let correctAnswer: string | boolean | null = null;
+
+    //     switch (question.type) {
+    //       case QuestionType.MCQ:
+    //         correctAnswer =
+    //           question.options?.find((opt) => opt.isCorrect)?.id ?? null;
+    //         break;
+    //       case QuestionType.TRUE_OR_FALSE:
+    //         correctAnswer =
+    //           typeof question.correctAnswerBoolean == 'boolean'
+    //             ? question.correctAnswerBoolean
+    //             : null;
+    //         break;
+    //       case QuestionType.FILL_IN_THE_BLANKS:
+    //         correctAnswer =
+    //           typeof question.correctAnswerText == 'string'
+    //             ? question.correctAnswerText
+    //             : null;
+    //         break;
+    //     }
+
+    //     return {
+    //       id: attempt.id,
+    //       selectedAnswer,
+    //       isCorrect: attempt.isCorrect,
+    //       question: {
+    //         id: question.id,
+    //         question: question.questionText,
+    //         type: question.type,
+    //         difficulty: question.difficulty,
+    //         subject: {
+    //           id: question.subject?.id,
+    //           name: question.subject?.name,
+    //         },
+    //         subSubject: {
+    //           id: question.subSubject?.id,
+    //           name: question.subSubject?.name,
+    //         },
+    //         options: question.options?.map((opt) => ({
+    //           id: opt.id,
+    //           option: opt.option_text,
+    //           isCorrect: opt.isCorrect,
+    //         })),
+    //         correctAnswer,
+    //       },
+    //     };
+    //   },
+    // );
+
+    // const attemptedQuestionsCount = questionAttempts.filter(
+    //   (a) => a.selectedAnswer !== null,
+    // ).length;
+
+    // const report = {
+    //   id: questionSetAttempt.id,
+    //   questionSetId: questionSetAttempt.questionSet.id,
+    //   startedAt: questionSetAttempt.startedAt,
+    //   completedAt: questionSetAttempt.completedAt,
+    //   isCompleted: questionSetAttempt.isCompleted,
+    //   score: questionSetAttempt.score,
+    //   percentage: questionSetAttempt.percentage,
+    //   questionSetName: questionSetAttempt.questionSet.name,
+    //   questionSetCategory: questionSetAttempt.questionSet.category,
+    //   questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
+    //   attemptedQuestionsCount,
+    //   questionAttempts,
+    // };
+
+    return {
+      success: true,
+      message: 'Question set report generated successfully.',
+      data: questionSetAttempt,
+    };
+  }
+
+  // Review answer of unchecked questionAttempt and mark it correct or incorrect
   async reviewAnswer(questionAttemptId: string, payload: ReviewAnswerDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -946,6 +947,7 @@ export class QuestionSetAttemptService {
     }
   }
 
+  // Mark isChecked , marking if the checking of the question set attempt is completed
   async markIsChecked(questionSetAttemptId: string) {
     const questionSetAttempt = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
@@ -987,47 +989,5 @@ export class QuestionSetAttemptService {
       message: 'Question set attempt marked as checked.',
       data: { questionSetAttemptId },
     };
-  }
-
-  //
-  async completeQuiz(questionSetAttemptId: string, queryRunner?: QueryRunner) {
-    const manager = queryRunner?.manager || this.dataSource.manager;
-
-    const questionSetAttempt = await manager
-      .getRepository(QuestionSetAttempt)
-      .createQueryBuilder('questionSetAttempt')
-      .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
-      .leftJoinAndSelect('questionSet.questions', 'question')
-      .where('questionSetAttempt.id = :questionSetAttemptId', {
-        questionSetAttemptId: questionSetAttemptId,
-      })
-      .getOne();
-
-    if (!questionSetAttempt || questionSetAttempt.isCompleted) return;
-
-    const questionAttempts = await manager
-      .getRepository(QuestionAttempt)
-      .createQueryBuilder('questionAttempt')
-      .where('questionAttempt.questionSetAttemptId = :questionSetAttemptId', {
-        questionSetAttemptId: questionSetAttemptId,
-      })
-      .getMany();
-
-    const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
-    const total = questionSetAttempt.questionSet.questions.length;
-
-    const hasManuallyCheckableQuestions =
-      questionSetAttempt.questionSet.questions.some(
-        (q) => q.type === QuestionType.SHORT || q.type === QuestionType.LONG,
-      );
-
-    questionSetAttempt.isCompleted = true;
-    questionSetAttempt.completedAt = new Date();
-    questionSetAttempt.score = correctCount;
-    questionSetAttempt.percentage =
-      total > 0 ? (correctCount / total) * 100 : 0;
-    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : null;
-
-    await manager.getRepository(QuestionSetAttempt).save(questionSetAttempt);
   }
 }

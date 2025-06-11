@@ -42,6 +42,9 @@ export class QuestionSetAttempt {
   @Column({ type: 'float', nullable: true })
   percentage: number;
 
+  @Column({ type: 'integer' })
+  attemptNumber: number;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;
