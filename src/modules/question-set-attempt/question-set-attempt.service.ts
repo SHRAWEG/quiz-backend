@@ -162,6 +162,7 @@ export class QuestionSetAttemptService {
     };
   }
 
+  // ACCESS : ADMIN
   async getQuestionSetAttemptsToReview() {
     const questionSetAttempts = await this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')

@@ -27,6 +27,7 @@ export class QuestionSetsService {
     @Inject(REQUEST) private readonly request: Request,
   ) {}
 
+  // ACCESS : ADMIN
   async create(dto: CreateQuestionSetDto) {
     const user = this.request.user;
 
@@ -87,6 +88,7 @@ export class QuestionSetsService {
     }
   }
 
+  // ACCESS : ADMIN
   async addQuestion(dto: AddQuestionDto) {
     // 1. Load the QuestionSet with its related Question IDs
     const questionSet = await this.questionSetRepository
@@ -154,6 +156,7 @@ export class QuestionSetsService {
     };
   }
 
+  // ACCESS : ADMIN
   async removeQuestion(dto: AddQuestionDto) {
     const { questionSetId, questionId } = dto;
 
@@ -222,6 +225,7 @@ export class QuestionSetsService {
     };
   }
 
+  // ACCESS : ADMIN
   async get(
     page: number,
     limit: number,
@@ -237,6 +241,10 @@ export class QuestionSetsService {
       .createQueryBuilder('questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
       .leftJoinAndSelect('questionSet.category', 'category')
+      .loadRelationCountAndMap(
+        'questionSet.questionSetAttemptsCount',
+        'questionSet.questionSetAttempts',
+      )
       .orderBy('questionSet.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
@@ -307,6 +315,7 @@ export class QuestionSetsService {
     search?: string,
     categoryId?: string,
   ) {
+    const user = this.request.user;
     const skip = (page - 1) * limit;
     console.log('QUETION SETS TO ATTEPT');
     const query = this.questionSetRepository
@@ -316,6 +325,21 @@ export class QuestionSetsService {
         'questionSet.questions',
       )
       .leftJoinAndSelect('questionSet.category', 'category')
+      // ✅ Count ALL attempts on the question set
+      .loadRelationCountAndMap(
+        'questionSet.questionSetAttempts',
+        'questionSet.questionSetAttempts',
+      )
+      // ✅ Count only current user's attempts
+      .loadRelationCountAndMap(
+        'questionSet.userQuestionSetAttempts',
+        'questionSet.questionSetAttempts',
+        'userAttempts',
+        (qb) =>
+          qb.andWhere('userAttempts.userId = :userId', {
+            userId: user?.sub,
+          }),
+      )
       .where('questionSet.status = :status', {
         status: QuestionSetStatus.PUBLISHED,
       })
@@ -348,23 +372,41 @@ export class QuestionSetsService {
   }
 
   async getQuestionSetToAttempt(id: string) {
+    const user = this.request.user;
+
     const query = this.questionSetRepository
       .createQueryBuilder('questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
       .leftJoinAndSelect('questionSet.questions', 'question')
-      .leftJoin('questionSet.createdBy', 'user')
+      .leftJoin('questionSet.createdBy', 'creator')
       .addSelect([
-        'user.id',
-        'user.firstName',
-        'user.middleName',
-        'user.lastName',
-        'user.email',
+        'creator.id',
+        'creator.firstName',
+        'creator.middleName',
+        'creator.lastName',
+        'creator.email',
       ])
       .leftJoin('question.options', 'option')
-      .addSelect(['option.id', 'option.option'])
-      .leftJoinAndSelect('question.subject', 'subject') // join but not select
-      .leftJoin('question.subSubject', 'subSubject') // join but not select
-      .addSelect(['subSubject.id', 'subSubject.name']) // project only needed fields
+      .addSelect(['option.id', 'option.optionText'])
+      .leftJoinAndSelect('question.subject', 'subject')
+      .leftJoin('question.subSubject', 'subSubject')
+      .addSelect(['subSubject.id', 'subSubject.name'])
+      // ✅ Count ALL attempts on this question set
+      .loadRelationCountAndMap(
+        'questionSet.totalAttempts',
+        'questionSet.questionSetAttempts',
+      )
+      // ✅ Count attempts made by the current user
+      .loadRelationCountAndMap(
+        'questionSet.userAttemptCount',
+        'questionSet.questionSetAttempts',
+        'userAttempts',
+        (qb) =>
+          qb.where('userAttempts.userId = :userId', {
+            userId: user?.sub,
+          }),
+      )
+
       .where('questionSet.id = :id', { id })
       .andWhere('questionSet.status = :status', {
         status: QuestionSetStatus.PUBLISHED,
