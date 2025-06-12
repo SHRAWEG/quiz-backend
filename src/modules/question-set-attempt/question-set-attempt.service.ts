@@ -337,6 +337,7 @@ export class QuestionSetAttemptService {
           userHighestScore: userHighestScore,
           userLowestScore: userAttemptCount > 0 ? userLowestScore : 0, // Set to 0 if no user attempts
           userAverageScore: userAverageScore,
+          totalAttempts: userAttemptCount,
         },
       },
     };
