@@ -266,7 +266,22 @@ export class QuestionSetAttemptService {
       throw new Error('QuestionSet ID not found for the attempt.'); // Or a more specific error
     }
 
+    const totalPossibleScore = questionSetAttempt.questionSet.questions
+      .length++; // <--- ADJUST THIS PROPERTY NAME
+
+    if (
+      totalPossibleScore === undefined ||
+      totalPossibleScore === null ||
+      totalPossibleScore <= 0
+    ) {
+      throw new Error(
+        'Total number of questions for the Question Set is not defined or is zero/negative. Cannot calculate percentages.',
+      );
+    }
+
     const currentAttemptScore = questionSetAttempt.score;
+    const currentAttemptPercentage =
+      (currentAttemptScore / totalPossibleScore) * 100;
 
     // 2. Fetch all completed attempts for this specific questionSetId
     const allCompletedAttemptsForSet = await this.questionSetAttemptsRepository
@@ -321,6 +336,21 @@ export class QuestionSetAttemptService {
     const userAverageScore =
       userAttemptCount > 0 ? userTotalScore / userAttemptCount : 0;
 
+    // Convert scores to percentages
+    const highestOverallPercentage =
+      (highestOverallScore / totalPossibleScore) * 100;
+    const lowestOverallPercentage =
+      overallAttemptCount > 0
+        ? (lowestOverallScore / totalPossibleScore) * 100
+        : 0;
+    const overallAveragePercentage =
+      (overallAverageScore / totalPossibleScore) * 100;
+
+    const userHighestPercentage = (userHighestScore / totalPossibleScore) * 100;
+    const userLowestPercentage =
+      userAttemptCount > 0 ? (userLowestScore / totalPossibleScore) * 100 : 0;
+    const userAveragePercentage = (userAverageScore / totalPossibleScore) * 100;
+
     return {
       success: true,
       message: 'Question set report generated successfully.',
@@ -328,16 +358,37 @@ export class QuestionSetAttemptService {
         ...questionSetAttempt, // Include all existing details of the current attempt
         reportStatistics: {
           currentAttemptScore: currentAttemptScore,
-          // Overall statistics
-          highestOverallScore: highestOverallScore,
-          lowestOverallScore: overallAttemptCount > 0 ? lowestOverallScore : 0, // Set to 0 if no attempts
-          overallAverageScore: overallAverageScore,
+          currentAttemptPercentage: parseFloat(
+            currentAttemptPercentage.toFixed(2),
+          ), // Format to 2 decimal places
 
-          // User-specific statistics for this question set
+          // Overall statistics (scores)
+          highestOverallScore: highestOverallScore,
+          lowestOverallScore: overallAttemptCount > 0 ? lowestOverallScore : 0,
+          overallAverageScore: parseFloat(overallAverageScore.toFixed(2)),
+
+          // Overall statistics (percentages)
+          highestOverallPercentage: parseFloat(
+            highestOverallPercentage.toFixed(2),
+          ),
+          lowestOverallPercentage: parseFloat(
+            lowestOverallPercentage.toFixed(2),
+          ),
+          overallAveragePercentage: parseFloat(
+            overallAveragePercentage.toFixed(2),
+          ),
+
+          // User-specific statistics (scores)
           userHighestScore: userHighestScore,
-          userLowestScore: userAttemptCount > 0 ? userLowestScore : 0, // Set to 0 if no user attempts
-          userAverageScore: userAverageScore,
-          totalAttempts: userAttemptCount,
+          userLowestScore: userAttemptCount > 0 ? userLowestScore : 0,
+          userAverageScore: parseFloat(userAverageScore.toFixed(2)),
+
+          // User-specific statistics (percentages)
+          userHighestPercentage: parseFloat(userHighestPercentage.toFixed(2)),
+          userLowestPercentage: parseFloat(userLowestPercentage.toFixed(2)),
+          userAveragePercentage: parseFloat(userAveragePercentage.toFixed(2)),
+          totalUserAttempts: userAttemptCount,
+          totalOverallAttempts: overallAttemptCount,
         },
       },
     };
