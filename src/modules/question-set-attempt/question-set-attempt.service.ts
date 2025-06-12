@@ -266,8 +266,7 @@ export class QuestionSetAttemptService {
       throw new Error('QuestionSet ID not found for the attempt.'); // Or a more specific error
     }
 
-    const totalPossibleScore = questionSetAttempt.questionSet.questions
-      .length++; // <--- ADJUST THIS PROPERTY NAME
+    const totalPossibleScore = questionSetAttempt.questionAttempts.length;
 
     if (
       totalPossibleScore === undefined ||

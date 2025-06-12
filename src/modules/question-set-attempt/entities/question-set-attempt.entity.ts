@@ -42,7 +42,7 @@ export class QuestionSetAttempt {
   @Column({ type: 'float', nullable: true })
   percentage: number;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'integer', default: 1 })
   attemptNumber: number;
 
   @ManyToOne(() => User)
