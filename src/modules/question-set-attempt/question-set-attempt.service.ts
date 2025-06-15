@@ -330,7 +330,7 @@ export class QuestionSetAttemptService {
       }
     }
 
-    const overallAverageScore =
+    const averageOverAllScore =
       overallAttemptCount > 0 ? totalOverallScore / overallAttemptCount : 0;
     const userAverageScore =
       userAttemptCount > 0 ? userTotalScore / userAttemptCount : 0;
@@ -342,8 +342,8 @@ export class QuestionSetAttemptService {
       overallAttemptCount > 0
         ? (lowestOverallScore / totalPossibleScore) * 100
         : 0;
-    const overallAveragePercentage =
-      (overallAverageScore / totalPossibleScore) * 100;
+    const averageOverallPercentage =
+      (averageOverAllScore / totalPossibleScore) * 100;
 
     const userHighestPercentage = (userHighestScore / totalPossibleScore) * 100;
     const userLowestPercentage =
@@ -364,7 +364,7 @@ export class QuestionSetAttemptService {
           // Overall statistics (scores)
           highestOverallScore: highestOverallScore,
           lowestOverallScore: overallAttemptCount > 0 ? lowestOverallScore : 0,
-          overallAverageScore: parseFloat(overallAverageScore.toFixed(2)),
+          averageOverAllScore: parseFloat(averageOverAllScore.toFixed(2)),
 
           // Overall statistics (percentages)
           highestOverallPercentage: parseFloat(
@@ -373,8 +373,8 @@ export class QuestionSetAttemptService {
           lowestOverallPercentage: parseFloat(
             lowestOverallPercentage.toFixed(2),
           ),
-          overallAveragePercentage: parseFloat(
-            overallAveragePercentage.toFixed(2),
+          averageOverallPercentage: parseFloat(
+            averageOverallPercentage.toFixed(2),
           ),
 
           // User-specific statistics (scores)
