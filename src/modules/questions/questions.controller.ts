@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,17 +9,26 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/role.decorator';
+import { QuestionStatus } from 'src/common/enums/question.enum';
 import { Role } from 'src/common/enums/roles.enum';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { QuestionsService } from './questions.service';
-import { QuestionStatus } from 'src/common/enums/question.enum';
 
 @Controller('questions')
 @UseGuards(AuthGuard, RolesGuard)
@@ -142,5 +152,49 @@ export class QuestionsController {
   @Roles(Role.ADMIN, Role.TEACHER)
   delete(@Param('id') id: string) {
     return this.questionService.delete(id);
+  }
+
+  // BULK UPLOAD
+  @Post('/upload-csv')
+  // @Roles(Role.ADMIN, Role.TEACHER)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      // Optional: Add file size limits, file type validation here
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+      },
+      fileFilter: (req, file, cb) => {
+        if (!file.originalname.match(/\.(csv)$/)) {
+          return cb(
+            new BadRequestException('Only CSV files are allowed!'),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload a CSV file containing questions' })
+  @ApiConsumes('multipart/form-data') // Important: Specifies the content type for file uploads
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary', // Tells Swagger that this is a file upload
+          description: 'CSV file containing question data',
+        },
+      },
+    },
+  })
+  uploadQuestionCsv(@UploadedFile() file: Express.Multer.File) {
+    // **Recommended: Explicitly check if the file exists**
+    if (!file) {
+      throw new BadRequestException('No CSV file uploaded.');
+    } else {
+      const csvBuffer: Buffer = file.buffer;
+      return this.questionService.bulkUploadQuestions(csvBuffer);
+    }
   }
 }
