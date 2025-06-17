@@ -462,7 +462,7 @@ export class QuestionSetAttemptService {
           questionSetAttemptId,
         })
         .andWhere('questionSetAttempt.userId = :userId', {
-          userId: user!.sub,
+          userId: user.sub,
         })
         .getOne();
 
@@ -569,18 +569,18 @@ export class QuestionSetAttemptService {
           .getOne();
 
         if (isCorrect) {
-          questionStats!.timesAnsweredCorrectly = questionAttempt?.isCorrect
-            ? questionStats!.timesAnsweredCorrectly
-            : questionStats!.timesAnsweredCorrectly + 1;
+          questionStats.timesAnsweredCorrectly = questionAttempt?.isCorrect
+            ? questionStats.timesAnsweredCorrectly
+            : questionStats.timesAnsweredCorrectly + 1;
         } else {
-          questionStats!.timesAnsweredCorrectly = questionAttempt?.isCorrect
-            ? questionStats!.timesAnsweredCorrectly - 1
-            : questionStats!.timesAnsweredCorrectly;
+          questionStats.timesAnsweredCorrectly = questionAttempt?.isCorrect
+            ? questionStats.timesAnsweredCorrectly - 1
+            : questionStats.timesAnsweredCorrectly;
         }
 
         await queryRunner.manager
           .getRepository(QuestionStats)
-          .save(questionStats!);
+          .save(questionStats);
       }
 
       questionAttempt.selectedOptionId = payload.selectedOptionId;
@@ -641,7 +641,7 @@ export class QuestionSetAttemptService {
         questionSetAttemptId,
       })
       .andWhere('questionSetAttempt.userId = :userId', {
-        userId: user!.sub,
+        userId: user.sub,
       })
       .getOne();
 
@@ -937,15 +937,15 @@ export class QuestionSetAttemptService {
 
       // If review changed from incorrect to correct
       if (!previousIsCorrect && payload.isCorrect) {
-        questionStats!.timesAnsweredCorrectly += 1;
+        questionStats.timesAnsweredCorrectly += 1;
       }
       // If review changed from correct to incorrect
       else if (previousIsCorrect && !payload.isCorrect) {
-        questionStats!.timesAnsweredCorrectly -= 1;
+        questionStats.timesAnsweredCorrectly -= 1;
       }
 
       // Save updated stats
-      await questionStatRepo.save(questionStats!);
+      await questionStatRepo.save(questionStats);
 
       // Save updated question attempt
       questionAttempt.isCorrect = payload.isCorrect;
@@ -967,12 +967,12 @@ export class QuestionSetAttemptService {
 
       const allQuestionAttempts = questionSetAttempt?.questionAttempts;
 
-      const score = allQuestionAttempts!.filter((a) => a.isCorrect).length;
-      const total = questionSetAttempt!.questionSet.questions.length;
+      const score = allQuestionAttempts.filter((a) => a.isCorrect).length;
+      const total = questionSetAttempt.questionSet.questions.length;
       const percentage = total > 0 ? (score / total) * 100 : 0;
-      questionSetAttempt!.score = score;
-      questionSetAttempt!.percentage = percentage;
-      await questionSetAttemptRepo.save(questionSetAttempt!);
+      questionSetAttempt.score = score;
+      questionSetAttempt.percentage = percentage;
+      await questionSetAttemptRepo.save(questionSetAttempt);
       await queryRunner.commitTransaction();
 
       return {

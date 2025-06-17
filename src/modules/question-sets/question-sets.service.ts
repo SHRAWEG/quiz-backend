@@ -46,7 +46,7 @@ export class QuestionSetsService {
       questionSet.timeLimitSeconds = dto.timeLimitSeconds;
       questionSet.categoryId = dto.categoryId;
       questionSet.status = QuestionSetStatus.DRAFT;
-      questionSet.createdById = user!.sub;
+      questionSet.createdById = user.sub;
 
       // 2. Insert the QuestionSet
       const insertedQuestionSet = await queryRunner.manager
@@ -235,7 +235,7 @@ export class QuestionSetsService {
     const user = this.request.user;
     const skip = (page - 1) * limit;
     const actStatus =
-      user!.role == Role.STUDENT ? QuestionSetStatus.PUBLISHED : status;
+      user.role == Role.STUDENT ? QuestionSetStatus.PUBLISHED : status;
 
     const query = this.questionSetRepository
       .createQueryBuilder('questionSet')
@@ -254,9 +254,7 @@ export class QuestionSetsService {
         search: `%${search}%`,
       });
     }
-    if (
-      Object.values(QuestionSetStatus).includes(actStatus as QuestionSetStatus)
-    ) {
+    if (Object.values(QuestionSetStatus).includes(actStatus)) {
       query.andWhere('questionSet.status = :status', { status: actStatus });
     }
 

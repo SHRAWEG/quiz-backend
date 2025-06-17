@@ -156,7 +156,7 @@ export class QuestionsController {
 
   // BULK UPLOAD
   @Post('/upload-csv')
-  @Roles(Role.TEACHER)
+  // @Roles(Role.ADMIN, Role.TEACHER)
   @UseInterceptors(
     FileInterceptor('file', {
       // Optional: Add file size limits, file type validation here
@@ -188,7 +188,7 @@ export class QuestionsController {
       },
     },
   })
-  uploadQuestionCsv(@UploadedFile() file: Express.Multer.File): Promise<any> {
+  uploadQuestionCsv(@UploadedFile() file: Express.Multer.File) {
     // **Recommended: Explicitly check if the file exists**
     if (!file) {
       throw new BadRequestException('No CSV file uploaded.');
