@@ -8,17 +8,11 @@ import {
 } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as csv from 'csv-parser';
 import { Request } from 'express';
 import { ApiResponse } from 'src/common/classes/api-response';
-import {
-  DifficultyLevel,
-  QuestionStatus,
-  QuestionType,
-} from 'src/common/enums/question.enum';
+import { QuestionStatus, QuestionType } from 'src/common/enums/question.enum';
 import { Role } from 'src/common/enums/roles.enum';
 import { ValidationException } from 'src/common/exceptions/validation.exception';
-import { Readable } from 'stream';
 import { DataSource, Repository } from 'typeorm';
 import { Option } from '../options/entities/option.entity';
 import { SubSubjectsService } from '../sub-subjects/sub-subjects.service';
@@ -26,27 +20,25 @@ import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { Question } from './entities/question.entity';
 
-interface CsvRow {
-  questionText: string;
-  type: string; // Corresponds to QuestionType enum string
-  difficulty: number; // Corresponds to DifficultyLevel enum string
-  subjectId: string; // UUID of Subject
-  subSubjectId: string; // UUID of SubSubject
-  option1?: string;
-  isCorrect1?: string; // 'TRUE' or 'FALSE'
-  option2?: string;
-  isCorrect2?: string;
-  option3?: string;
-  isCorrect3?: string;
-  option4?: string;
-  isCorrect4?: string;
-  correctAnswerBoolean?: string; // 'TRUE' or 'FALSE'
-  correctAnswerText?: string;
-  // Add more options (option5, isCorrect5, etc.) if your CSV supports more than 4 per MCQ
-}
-interface QuestionWithTempOptions extends Question {
-  _tempOptions?: Option[]; // Add the temporary options property
-}
+// interface CsvRow {
+//   question: string;
+//   type: string; // Corresponds to QuestionType enum string
+//   difficulty: number; // Corresponds to DifficultyLevel enum string
+//   subSubject: string; // UUID of SubSubject
+//   option1?: string;
+//   option2?: string;
+//   option3?: string;
+//   option4?: string;
+//   correctAnswer?: string;
+//   // Add more options (option5, isCorrect5, etc.) if your CSV supports more than 4 per MCQ
+// }
+// interface QuestionWithTempOptions extends Question {
+//   _tempOptions?: Option[]; // Add the temporary options property
+// }
+
+// function isNullOrEmpty(str: string | null | undefined): boolean {
+//   return str === null || str === undefined || str.trim() === '';
+// }
 
 @Injectable()
 export class QuestionsService {
@@ -510,191 +502,226 @@ export class QuestionsService {
   }
 
   async bulkUploadQuestions(csvBuffer: Buffer) {
-    const user = this.request.user;
-    const questionsToProcess: Question[] = [];
-    const errors: { row: number; data: CsvRow; message: string }[] = [];
-    let rowNum = 1;
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate async operation
+    return csvBuffer;
+    //   const user = this.request.user;
+    //   const questionsToProcess: Question[] = [];
+    //   const errors: { row: number; data: CsvRow; message: string }[] = [];
+    //   let rowNum = 1;
 
-    const stream = Readable.from(csvBuffer.toString());
-    const uniqueSubjectIds = new Set<string>();
-    const uniqueSubSubjectIds = new Set<string>();
+    //   const stream = Readable.from(csvBuffer.toString());
+    //   // const uniqueSubjectIds = new Set<string>();
+    //   const uniqueSubSubjectIds = new Set<string>();
 
-    await new Promise<void>((resolve, reject) => {
-      stream
-        .pipe(csv())
-        .on('data', (row: CsvRow) => {
-          rowNum++; // Increment row number for each data row
-          try {
-            // Trim whitespace from all string values in the row
-            for (const key in row) {
-              if (typeof row[key] === 'string') {
-                row[key] = row[key].trim();
-              }
-            }
+    //   await new Promise<void>((resolve, reject) => {
+    //     stream
+    //       .pipe(csv())
+    //       .on('data', async (row: CsvRow) => {
+    //         console.log(row);
+    //         rowNum++; // Increment row number for each data row
+    //         try {
+    //           // Trim whitespace from all string values in the row
+    //           for (const key in row) {
+    //             if (typeof row[key] === 'string') {
+    //               row[key] = row[key].trim();
+    //             }
+    //           }
 
-            // Basic validation for essential fields
-            if (
-              !row.questionText ||
-              !row.type ||
-              !row.difficulty ||
-              !row.subjectId ||
-              !row.subSubjectId
-            ) {
-              throw new BadRequestException(
-                'Missing essential fields (questionText, type, difficulty, subjectId, subSubjectId).',
-              );
-            }
+    //           // Basic validation for essential fields
+    //           if (
+    //             !row.question ||
+    //             !row.type ||
+    //             !row.difficulty ||
+    //             !row.subSubject ||
+    //             !row.correctAnswer
+    //           ) {
+    //             errors.push({
+    //               row: rowNum,
+    //               data: row,
+    //               message:
+    //                 'Missing essential fields (question, type, difficulty, subSubject).',
+    //             })
+    //           }
 
-            // Validate Enums using strict comparison
-            const questionType = row.type as QuestionType;
-            const difficultyLevel = row.difficulty as DifficultyLevel;
+    //           // Validate Enums using strict comparison
+    //           const questionType = row.type as QuestionType;
+    //           const difficultyLevel = row.difficulty as DifficultyLevel;
 
-            if (!Object.values(QuestionType).includes(questionType)) {
-              throw new BadRequestException(
-                `Invalid Question Type: '${row.type}'. Must be one of: ${Object.values(QuestionType).join(', ')}`,
-              );
-            }
-            if (!Object.values(DifficultyLevel).includes(difficultyLevel)) {
-              throw new BadRequestException(
-                `Invalid Difficulty Level: '${row.difficulty}'. Must be one of: ${Object.values(DifficultyLevel).join(', ')}`,
-              );
-            }
+    //           console.log(questionType);
 
-            // Collect IDs for bulk validation later
-            uniqueSubjectIds.add(row.subjectId);
-            uniqueSubSubjectIds.add(row.subSubjectId);
+    //           if (!Object.values(QuestionType).includes(questionType)) {
+    //             errors.push({
+    //               row: rowNum,
+    //               data: row,
+    //               message: `Invalid Question Type: '${row.type}'. Must be one of: ${Object.values(QuestionType).join(', ')}`,
+    //             });
+    //           }
 
-            const question: QuestionWithTempOptions =
-              this.questionsRepository.create({
-                questionText: row.questionText,
-                type: questionType,
-                difficulty: difficultyLevel,
-                subjectId: row.subjectId,
-                subSubjectId: row.subSubjectId,
-                createdById: user?.sub,
-                status: QuestionStatus.PENDING,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              });
+    //           if (!Object.values(DifficultyLevel).includes(difficultyLevel)) {
+    //             errors.push({
+    //               row: rowNum,
+    //               data: row,
+    //               message: `Invalid Difficulty Level: '${row.difficulty}'. Must be one of: ${Object.values(DifficultyLevel).join(', ')}`,
+    //             });
+    //           }
 
-            const tempOptions: Option[] = []; // Use a temporary array for options
+    //           var subSubject = (await this.subSubjectService.getByName(row.subSubject)).data;
 
-            // Handle different question types and their correct answers/options
-            switch (question.type) {
-              case QuestionType.MCQ: {
-                let hasCorrectOption = false;
-                let optionCount = 0;
+    //           if (!subSubject) {
+    //             errors.push({
+    //               row: rowNum,
+    //               data: row,
+    //               message: `Sub-Subject '${row.subSubject}' not found.`,
+    //             })
+    //           }
 
-                for (let i = 1; i <= 4; i++) {
-                  // Assuming up to 4 options based on your CSV example
-                  const optionText = row[`option${i}` as keyof CsvRow] as
-                    | string
-                    | undefined;
-                  const isCorrectStr = row[`isCorrect${i}` as keyof CsvRow] as
-                    | string
-                    | undefined;
+    //           // Collect IDs for bulk validation later
+    //           uniqueSubSubjectIds.add(subSubject?.id);
 
-                  if (optionText) {
-                    optionCount++;
-                    const isCorrect = isCorrectStr?.toUpperCase() === 'TRUE';
-                    if (isCorrect) hasCorrectOption = true;
+    //           const question: QuestionWithTempOptions =
+    //             this.questionsRepository.create({
+    //               questionText: row.question,
+    //               type: questionType,
+    //               difficulty: difficultyLevel,
+    //               subjectId: subSubject?.subjectId,
+    //               subSubjectId: subSubject?.id,
+    //               createdById: user?.sub,
+    //               status: QuestionStatus.PENDING,
+    //               createdAt: new Date(),
+    //               updatedAt: new Date(),
+    //             });
 
-                    tempOptions.push(
-                      this.optionsRepository.create({
-                        optionText: optionText,
-                        isCorrect: isCorrect,
-                        // question: question, // Will link after question is saved
-                      }),
-                    );
-                  }
-                }
-                if (optionCount < 2) {
-                  throw new BadRequestException(
-                    'MCQ questions must have at least 2 options.',
-                  );
-                }
-                if (!hasCorrectOption) {
-                  throw new BadRequestException(
-                    'MCQ questions must have at least one correct option.',
-                  );
-                }
-                // Assign to the defined _tempOptions property
-                question._tempOptions = tempOptions;
-                break;
-              }
+    //           const tempOptions: Option[] = []; // Use a temporary array for options
 
-              case QuestionType.TRUE_OR_FALSE: {
-                if (
-                  row.correctAnswerBoolean === undefined ||
-                  row.correctAnswerBoolean === null ||
-                  row.correctAnswerBoolean === ''
-                ) {
-                  throw new BadRequestException(
-                    'TRUE_FALSE question requires correctAnswerBoolean (TRUE/FALSE).',
-                  );
-                }
-                const boolValue = row.correctAnswerBoolean.toUpperCase();
-                if (boolValue !== 'TRUE' && boolValue !== 'FALSE') {
-                  throw new BadRequestException(
-                    'correctAnswerBoolean for TRUE_FALSE must be "TRUE" or "FALSE".',
-                  );
-                }
-                question.correctAnswerBoolean = boolValue === 'TRUE';
-                break;
-              }
+    //           // Handle different question types and their correct answers/options
+    //           switch (question.type) {
+    //             case QuestionType.MCQ: {
+    //               if (isNullOrEmpty(row.option1)
+    //                 || isNullOrEmpty(row.option2)
+    //                 || isNullOrEmpty(row.option3)
+    //                 || isNullOrEmpty(row.option4)
+    //                 || isNullOrEmpty(row.correctAnswer)) {
+    //                 errors.push({
+    //                   row: rowNum,
+    //                   data: row,
+    //                   message:
+    //                     'MCQ question requires options and a correct answer.'
+    //                 })
+    //               }
 
-              case QuestionType.FILL_IN_THE_BLANKS: {
-                if (
-                  !row.correctAnswerText ||
-                  row.correctAnswerText.length === 0
-                ) {
-                  throw new BadRequestException(
-                    'FILL_IN_THE_BLANK question requires correctAnswerText.',
-                  );
-                }
-                question.correctAnswerText = row.correctAnswerText;
-                break;
-              }
+    //               let optionCount = 0;
+    //               let hasCorrectOption = false;
 
-              case QuestionType.SHORT:
-              case QuestionType.LONG:
-                // No specific correct answer fields are stored directly in the Question entity for these types.
-                // Ensure no conflicting correct answer fields are set for these types from CSV to avoid data inconsistencies.
-                if (
-                  row.correctAnswerBoolean ||
-                  row.correctAnswerText ||
-                  row.option1
-                ) {
-                  this.logger.warn(
-                    `Row ${rowNum}: Correct answer/option data provided for ${question.type} question. This data will be ignored.`,
-                  );
-                }
-                break;
+    //               for (let i = 1; i <= 4; i++) {
+    //                 // Assuming up to 4 options based on your CSV example
+    //                 const optionText = row[`option${i}` as keyof CsvRow] as
+    //                   | string
+    //                   | undefined;
+    //                 const correctAnswer = row.correctAnswer as
+    //                   | string
+    //                   | undefined;
 
-              default:
-                // This case should ideally not be reached if enum validation passes
-                throw new BadRequestException(
-                  `Unhandled Question Type: ${question.type as string}`,
-                );
-            }
+    //                 if (optionText) {
+    //                   optionCount++;
+    //                   const isCorrect = optionText === correctAnswer;
+    //                   if (isCorrect) hasCorrectOption = true;
 
-            questionsToProcess.push(question);
-          } catch (e) {
-            const error = e as Error;
-            this.logger.error(
-              `Error processing CSV row ${rowNum}: ${error.message}`,
-              error.stack,
-              row,
-            );
-            errors.push({
-              row: rowNum,
-              data: row,
-              message: error.message || 'Unknown parsing error',
-            });
-          }
-        })
-        .on('end', resolve)
-        .on('error', reject);
-    });
+    //                   tempOptions.push(
+    //                     this.optionsRepository.create({
+    //                       optionText: optionText,
+    //                       isCorrect: isCorrect,
+    //                     }),
+    //                   );
+    //                 }
+    //               }
+    //               if (!hasCorrectOption) {
+    //                 errors.push({
+    //                   row: rowNum,
+    //                   data: row,
+    //                   message:
+    //                     'At least one option must match the correctAnswer for MCQ.',
+    //                 });
+    //               }
+    //               // Assign to the defined _tempOptions property
+    //               question._tempOptions = tempOptions;
+    //               break;
+    //             }
+
+    //             case QuestionType.TRUE_OR_FALSE: {
+    //               const boolValue = row.correctAnswer.toUpperCase();
+    //               if (boolValue !== 'TRUE' && boolValue !== 'FALSE') {
+    //                 errors.push({
+    //                   row: rowNum,
+    //                   data: row,
+    //                   message:
+    //                     'Correct answer for TRUE_OR_FALSE must be "True" or "False".',
+    //                 });
+    //               }
+    //               question.correctAnswerBoolean = boolValue === 'TRUE';
+    //               break;
+    //             }
+
+    //             case QuestionType.FILL_IN_THE_BLANKS: {
+    //               if (isNullOrEmpty(row.correctAnswer)) {
+    //                 errors.push({
+    //                   row: rowNum,
+    //                   data: row,
+    //                   message:
+    //                     'Correct answer is required for FILL_IN_THE_BLANKS type.',
+    //                 });
+    //               }
+    //               question.correctAnswerText = row.correctAnswer;
+    //               break;
+    //             }
+
+    //             case QuestionType.SHORT:
+    //             case QuestionType.LONG:
+
+    //             default:
+    //               // This case should ideally not be reached if enum validation passes
+    //               errors.push({
+    //                 row: rowNum,
+    //                 data: row,
+    //                 message: `Unsupported question type: '${row.type}'. Must be one of: ${Object.values(QuestionType).join(', ')}`,
+    //               });
+    //           }
+
+    //           questionsToProcess.push(question);
+    //         } catch (e) {
+    //           const error = e as Error;
+    //           this.logger.error(
+    //             `Error processing CSV row ${rowNum}: ${error.message}`,
+    //             error.stack,
+    //             row,
+    //           );
+    //           errors.push({
+    //             row: rowNum,
+    //             data: row,
+    //             message: error.message || 'Unknown parsing error',
+    //           });
+    //         }
+    //       })
+    //       .on('end', resolve)
+    //       .on('error', reject);
+    //   });
+    //   if (errors.length > 0) {
+    //     this.logger.error(
+    //       `CSV parsing completed with ${errors.length} errors.`,
+    //       JSON.stringify(errors, null, 2),
+    //     );
+    //     return {
+    //       success: false,
+    //       message: 'CSV parsing completed with errors',
+    //       data: { errors },
+    //     };
+    //   }
+
+    //   return {
+    //     success: true,
+    //     message: 'CSV parsing completed successfully',
+    //     data: {
+    //       totalQuestions: questionsToProcess.length
+    //     },
+    //   }
   }
 }

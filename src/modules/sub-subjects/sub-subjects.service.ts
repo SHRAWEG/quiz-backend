@@ -117,6 +117,25 @@ export class SubSubjectsService {
     };
   }
 
+  async getByName(name: string) {
+    const queryBuilder = this.subSubjectRepository
+      .createQueryBuilder('subSubject')
+      .leftJoinAndSelect('subSubject.subject', 'subject')
+      .where('subSubject.name = :name', { name });
+
+    const subSubject = await queryBuilder.getOne();
+
+    if (!subSubject) {
+      throw new HttpException('Sub-Subject not found', HttpStatus.NOT_FOUND);
+    }
+
+    return {
+      success: true,
+      message: 'Sub-Subject retrieved successfully',
+      data: subSubject,
+    };
+  }
+
   async update(id: string, updateSubSubjectDto: UpdateSubSubjectDto) {
     const queryBuilder = this.subSubjectRepository
       .createQueryBuilder()
