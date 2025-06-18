@@ -8,11 +8,17 @@ import {
 } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as csv from 'csv-parser';
 import { Request } from 'express';
 import { ApiResponse } from 'src/common/classes/api-response';
-import { QuestionStatus, QuestionType } from 'src/common/enums/question.enum';
+import {
+  DifficultyLevel,
+  QuestionStatus,
+  QuestionType,
+} from 'src/common/enums/question.enum';
 import { Role } from 'src/common/enums/roles.enum';
 import { ValidationException } from 'src/common/exceptions/validation.exception';
+import { Readable } from 'stream';
 import { DataSource, Repository } from 'typeorm';
 import { Option } from '../options/entities/option.entity';
 import { SubSubjectsService } from '../sub-subjects/sub-subjects.service';
@@ -20,25 +26,25 @@ import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { Question } from './entities/question.entity';
 
-// interface CsvRow {
-//   question: string;
-//   type: string; // Corresponds to QuestionType enum string
-//   difficulty: number; // Corresponds to DifficultyLevel enum string
-//   subSubject: string; // UUID of SubSubject
-//   option1?: string;
-//   option2?: string;
-//   option3?: string;
-//   option4?: string;
-//   correctAnswer?: string;
-//   // Add more options (option5, isCorrect5, etc.) if your CSV supports more than 4 per MCQ
-// }
-// interface QuestionWithTempOptions extends Question {
-//   _tempOptions?: Option[]; // Add the temporary options property
-// }
+interface CsvRow {
+  Question: string;
+  Type: string; // Corresponds to QuestionType enum string
+  Difficulty: string; // Corresponds to DifficultyLevel enum string
+  SubSubject: string; // UUID of SubSubject
+  Option1?: string;
+  Option2?: string;
+  Option3?: string;
+  Option4?: string;
+  CorrectAnswer?: string;
+  // Add more options (option5, isCorrect5, etc.) if your CSV supports more than 4 per MCQ
+}
+interface QuestionWithTempOptions extends Question {
+  _tempOptions?: Option[]; // Add the temporary options property
+}
 
-// function isNullOrEmpty(str: string | null | undefined): boolean {
-//   return str === null || str === undefined || str.trim() === '';
-// }
+function isNullOrEmpty(str: string | null | undefined): boolean {
+  return str === null || str === undefined || str.trim() === '';
+}
 
 @Injectable()
 export class QuestionsService {
@@ -502,226 +508,255 @@ export class QuestionsService {
   }
 
   async bulkUploadQuestions(csvBuffer: Buffer) {
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate async operation
-    return csvBuffer;
-    //   const user = this.request.user;
-    //   const questionsToProcess: Question[] = [];
-    //   const errors: { row: number; data: CsvRow; message: string }[] = [];
-    //   let rowNum = 1;
+    const user = this.request.user;
+    const questionsToProcess: Question[] = [];
+    const errors: { row: number; data: CsvRow; message: string }[] = [];
+    const rows: CsvRow[] = [];
 
-    //   const stream = Readable.from(csvBuffer.toString());
-    //   // const uniqueSubjectIds = new Set<string>();
-    //   const uniqueSubSubjectIds = new Set<string>();
+    // 1. Collect all rows synchronously
+    await new Promise<void>((resolve, reject) => {
+      Readable.from(csvBuffer.toString())
+        .pipe(csv())
+        .on('data', (row: CsvRow) => {
+          rows.push(row);
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
 
-    //   await new Promise<void>((resolve, reject) => {
-    //     stream
-    //       .pipe(csv())
-    //       .on('data', async (row: CsvRow) => {
-    //         console.log(row);
-    //         rowNum++; // Increment row number for each data row
-    //         try {
-    //           // Trim whitespace from all string values in the row
-    //           for (const key in row) {
-    //             if (typeof row[key] === 'string') {
-    //               row[key] = row[key].trim();
-    //             }
-    //           }
+    // 2. Process rows asynchronously
+    let rowNum = 1;
+    for (const row of rows) {
+      rowNum++;
+      try {
+        // Trim whitespace from all string values in the row
+        for (const key in row) {
+          if (typeof row[key] === 'string') {
+            row[key] = row[key].trim();
+          }
+        }
 
-    //           // Basic validation for essential fields
-    //           if (
-    //             !row.question ||
-    //             !row.type ||
-    //             !row.difficulty ||
-    //             !row.subSubject ||
-    //             !row.correctAnswer
-    //           ) {
-    //             errors.push({
-    //               row: rowNum,
-    //               data: row,
-    //               message:
-    //                 'Missing essential fields (question, type, difficulty, subSubject).',
-    //             })
-    //           }
+        // Basic validation for essential fields
+        if (
+          isNullOrEmpty(row.Question) ||
+          isNullOrEmpty(row.Type) ||
+          isNullOrEmpty(row.Difficulty) ||
+          isNullOrEmpty(row.SubSubject)
+        ) {
+          errors.push({
+            row: rowNum,
+            data: row,
+            message:
+              'Missing essential fields (Question, Type, Difficulty, SubSubject).',
+          });
+        }
 
-    //           // Validate Enums using strict comparison
-    //           const questionType = row.type as QuestionType;
-    //           const difficultyLevel = row.difficulty as DifficultyLevel;
+        // Validate Enums using strict comparison
+        const questionType = row.Type as QuestionType;
+        const difficultyLevel = Number.parseInt(
+          row.Difficulty,
+        ) as DifficultyLevel;
 
-    //           console.log(questionType);
+        if (!Object.values(QuestionType).includes(questionType)) {
+          errors.push({
+            row: rowNum,
+            data: row,
+            message: `Invalid Question Type: '${row.Type}'. Must be one of: ${Object.values(QuestionType).join(', ')}`,
+          });
+        }
 
-    //           if (!Object.values(QuestionType).includes(questionType)) {
-    //             errors.push({
-    //               row: rowNum,
-    //               data: row,
-    //               message: `Invalid Question Type: '${row.type}'. Must be one of: ${Object.values(QuestionType).join(', ')}`,
-    //             });
-    //           }
+        if (!Object.values(DifficultyLevel).includes(difficultyLevel)) {
+          errors.push({
+            row: rowNum,
+            data: row,
+            message: `Invalid Difficulty Level: '${row.Difficulty}'. Must be one of: 1, 2, 3, 4, 5`,
+          });
+        }
 
-    //           if (!Object.values(DifficultyLevel).includes(difficultyLevel)) {
-    //             errors.push({
-    //               row: rowNum,
-    //               data: row,
-    //               message: `Invalid Difficulty Level: '${row.difficulty}'. Must be one of: ${Object.values(DifficultyLevel).join(', ')}`,
-    //             });
-    //           }
+        // Check for duplicate question (case-insensitive, trimmed)
+        const exists = await this.questionsRepository
+          .createQueryBuilder('question')
+          .where(
+            'LOWER(TRIM(question.questionText)) = LOWER(TRIM(:Question))',
+            { Question: row.Question },
+          )
+          .getExists();
 
-    //           var subSubject = (await this.subSubjectService.getByName(row.subSubject)).data;
+        if (exists) {
+          errors.push({
+            row: rowNum,
+            data: row,
+            message: `Question '${row.Question}' already exists.`,
+          });
+        }
 
-    //           if (!subSubject) {
-    //             errors.push({
-    //               row: rowNum,
-    //               data: row,
-    //               message: `Sub-Subject '${row.subSubject}' not found.`,
-    //             })
-    //           }
+        // Check subSubject existence
+        const subSubject = (
+          await this.subSubjectService.getByName(row.SubSubject)
+        ).data;
+        if (!subSubject) {
+          errors.push({
+            row: rowNum,
+            data: row,
+            message: `Sub-Subject '${row.SubSubject}' not found.`,
+          });
+        }
 
-    //           // Collect IDs for bulk validation later
-    //           uniqueSubSubjectIds.add(subSubject?.id);
+        // Create question entity
+        const question: QuestionWithTempOptions =
+          this.questionsRepository.create({
+            questionText: row.Question,
+            type: questionType,
+            difficulty: difficultyLevel,
+            subjectId: subSubject?.subjectId,
+            subSubjectId: subSubject?.id,
+            createdById: user?.sub,
+            status: QuestionStatus.PENDING,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
 
-    //           const question: QuestionWithTempOptions =
-    //             this.questionsRepository.create({
-    //               questionText: row.question,
-    //               type: questionType,
-    //               difficulty: difficultyLevel,
-    //               subjectId: subSubject?.subjectId,
-    //               subSubjectId: subSubject?.id,
-    //               createdById: user?.sub,
-    //               status: QuestionStatus.PENDING,
-    //               createdAt: new Date(),
-    //               updatedAt: new Date(),
-    //             });
+        const tempOptions: Option[] = [];
 
-    //           const tempOptions: Option[] = []; // Use a temporary array for options
+        // Handle different question types and their correct answers/options
+        switch (question.type) {
+          case QuestionType.MCQ: {
+            if (
+              isNullOrEmpty(row.Option1) ||
+              isNullOrEmpty(row.Option2) ||
+              isNullOrEmpty(row.Option3) ||
+              isNullOrEmpty(row.Option4) ||
+              isNullOrEmpty(row.CorrectAnswer)
+            ) {
+              errors.push({
+                row: rowNum,
+                data: row,
+                message: 'MCQ question requires options and a correct answer.',
+              });
+              break;
+            }
 
-    //           // Handle different question types and their correct answers/options
-    //           switch (question.type) {
-    //             case QuestionType.MCQ: {
-    //               if (isNullOrEmpty(row.option1)
-    //                 || isNullOrEmpty(row.option2)
-    //                 || isNullOrEmpty(row.option3)
-    //                 || isNullOrEmpty(row.option4)
-    //                 || isNullOrEmpty(row.correctAnswer)) {
-    //                 errors.push({
-    //                   row: rowNum,
-    //                   data: row,
-    //                   message:
-    //                     'MCQ question requires options and a correct answer.'
-    //                 })
-    //               }
+            let hasCorrectOption = false;
+            for (let i = 1; i <= 4; i++) {
+              const optionText = row[`Option${i}` as keyof CsvRow];
+              const correctAnswer = row.CorrectAnswer;
 
-    //               let optionCount = 0;
-    //               let hasCorrectOption = false;
+              if (optionText) {
+                const isCorrect = optionText === correctAnswer;
+                if (isCorrect) hasCorrectOption = true;
 
-    //               for (let i = 1; i <= 4; i++) {
-    //                 // Assuming up to 4 options based on your CSV example
-    //                 const optionText = row[`option${i}` as keyof CsvRow] as
-    //                   | string
-    //                   | undefined;
-    //                 const correctAnswer = row.correctAnswer as
-    //                   | string
-    //                   | undefined;
+                tempOptions.push(
+                  this.optionsRepository.create({
+                    optionText: optionText,
+                    isCorrect: isCorrect,
+                  }),
+                );
+              }
+            }
+            if (!hasCorrectOption) {
+              errors.push({
+                row: rowNum,
+                data: row,
+                message:
+                  'At least one option must match the correctAnswer for MCQ.',
+              });
+            }
+            question._tempOptions = tempOptions;
+            break;
+          }
 
-    //                 if (optionText) {
-    //                   optionCount++;
-    //                   const isCorrect = optionText === correctAnswer;
-    //                   if (isCorrect) hasCorrectOption = true;
+          case QuestionType.TRUE_OR_FALSE: {
+            const boolValue = row.CorrectAnswer.toUpperCase();
+            if (boolValue !== 'TRUE' && boolValue !== 'FALSE') {
+              errors.push({
+                row: rowNum,
+                data: row,
+                message:
+                  'Correct answer for TRUE_OR_FALSE must be "True" or "False".',
+              });
+            }
+            question.correctAnswerBoolean = boolValue === 'TRUE';
+            break;
+          }
 
-    //                   tempOptions.push(
-    //                     this.optionsRepository.create({
-    //                       optionText: optionText,
-    //                       isCorrect: isCorrect,
-    //                     }),
-    //                   );
-    //                 }
-    //               }
-    //               if (!hasCorrectOption) {
-    //                 errors.push({
-    //                   row: rowNum,
-    //                   data: row,
-    //                   message:
-    //                     'At least one option must match the correctAnswer for MCQ.',
-    //                 });
-    //               }
-    //               // Assign to the defined _tempOptions property
-    //               question._tempOptions = tempOptions;
-    //               break;
-    //             }
+          case QuestionType.FILL_IN_THE_BLANKS: {
+            if (isNullOrEmpty(row.CorrectAnswer)) {
+              errors.push({
+                row: rowNum,
+                data: row,
+                message:
+                  'Correct answer is required for FILL_IN_THE_BLANKS type.',
+              });
+            }
+            question.correctAnswerText = row.CorrectAnswer;
+            break;
+          }
 
-    //             case QuestionType.TRUE_OR_FALSE: {
-    //               const boolValue = row.correctAnswer.toUpperCase();
-    //               if (boolValue !== 'TRUE' && boolValue !== 'FALSE') {
-    //                 errors.push({
-    //                   row: rowNum,
-    //                   data: row,
-    //                   message:
-    //                     'Correct answer for TRUE_OR_FALSE must be "True" or "False".',
-    //                 });
-    //               }
-    //               question.correctAnswerBoolean = boolValue === 'TRUE';
-    //               break;
-    //             }
+          case QuestionType.SHORT:
+          case QuestionType.LONG:
+          default:
+            errors.push({
+              row: rowNum,
+              data: row,
+              message: `Unsupported question type: '${row.Type}'. Must be one of: ${Object.values(QuestionType).join(', ')}`,
+            });
+        }
 
-    //             case QuestionType.FILL_IN_THE_BLANKS: {
-    //               if (isNullOrEmpty(row.correctAnswer)) {
-    //                 errors.push({
-    //                   row: rowNum,
-    //                   data: row,
-    //                   message:
-    //                     'Correct answer is required for FILL_IN_THE_BLANKS type.',
-    //                 });
-    //               }
-    //               question.correctAnswerText = row.correctAnswer;
-    //               break;
-    //             }
+        questionsToProcess.push(question);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Unknown error';
+        errors.push({
+          row: rowNum,
+          data: row,
+          message: `Error processing row ${rowNum}: ${errorMessage}`,
+        });
+      }
+    }
 
-    //             case QuestionType.SHORT:
-    //             case QuestionType.LONG:
+    // Log and return errors if any
+    if (errors.length > 0) {
+      this.logger.error(
+        `CSV processing completed with ${errors.length} errors.`,
+        JSON.stringify(errors, null, 2),
+      );
+      return {
+        success: false,
+        message: 'CSV processing completed with errors',
+        data: { errors },
+      };
+    }
 
-    //             default:
-    //               // This case should ideally not be reached if enum validation passes
-    //               errors.push({
-    //                 row: rowNum,
-    //                 data: row,
-    //                 message: `Unsupported question type: '${row.type}'. Must be one of: ${Object.values(QuestionType).join(', ')}`,
-    //               });
-    //           }
+    // If no errors, proceed with bulk insert
+    try {
+      for (const question of questionsToProcess) {
+        const savedQuestion = await this.questionsRepository.save(question);
+        const questionWithTempOptions = question as QuestionWithTempOptions;
 
-    //           questionsToProcess.push(question);
-    //         } catch (e) {
-    //           const error = e as Error;
-    //           this.logger.error(
-    //             `Error processing CSV row ${rowNum}: ${error.message}`,
-    //             error.stack,
-    //             row,
-    //           );
-    //           errors.push({
-    //             row: rowNum,
-    //             data: row,
-    //             message: error.message || 'Unknown parsing error',
-    //           });
-    //         }
-    //       })
-    //       .on('end', resolve)
-    //       .on('error', reject);
-    //   });
-    //   if (errors.length > 0) {
-    //     this.logger.error(
-    //       `CSV parsing completed with ${errors.length} errors.`,
-    //       JSON.stringify(errors, null, 2),
-    //     );
-    //     return {
-    //       success: false,
-    //       message: 'CSV parsing completed with errors',
-    //       data: { errors },
-    //     };
-    //   }
-
-    //   return {
-    //     success: true,
-    //     message: 'CSV parsing completed successfully',
-    //     data: {
-    //       totalQuestions: questionsToProcess.length
-    //     },
-    //   }
+        if (
+          questionWithTempOptions._tempOptions &&
+          questionWithTempOptions._tempOptions.length > 0
+        ) {
+          for (const option of questionWithTempOptions._tempOptions) {
+            option.questionId = savedQuestion.id;
+          }
+          await this.optionsRepository.save(
+            questionWithTempOptions._tempOptions,
+          );
+        }
+      }
+      return {
+        success: true,
+        message: 'Questions uploaded successfully',
+        data: {
+          totalQuestions: questionsToProcess.length,
+        },
+      };
+    } catch (err) {
+      this.logger.error('Error saving questions:', err);
+      throw new BadRequestException(
+        'Error saving questions. Please try again.',
+      );
+    }
   }
 }
