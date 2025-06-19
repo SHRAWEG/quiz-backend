@@ -156,7 +156,7 @@ export class QuestionsController {
 
   // BULK UPLOAD
   @Post('/upload-csv')
-  @Roles(Role.TEACHER)
+  @Roles(Role.ADMIN, Role.TEACHER)
   @UseInterceptors(
     FileInterceptor('file', {
       // Optional: Add file size limits, file type validation here
