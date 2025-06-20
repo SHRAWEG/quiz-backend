@@ -38,9 +38,6 @@ export class UserSubscription {
   })
   paymentMethod: PaymentMethod;
 
-  @Column({ nullable: true })
-  paymentReference?: string; // eSewa transaction ID
-
   @Column({ type: 'timestamp', nullable: true })
   startedAt?: Date;
 
@@ -50,6 +47,19 @@ export class UserSubscription {
   @Column({ default: false })
   isActive: boolean;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  total_amount: number; // NPR})
+
+  @Column({ type: 'text' })
+  product_code: string;
+
+  @Column({ type: 'uuid' })
+  transaction_uuid: string; // Unique identifier for the transaction
+
+  @Column({ type: 'text' })
+  signature: string; // Signature for transaction verification
+
+  @Column({})
   @CreateDateColumn()
   createdAt: Date;
 
