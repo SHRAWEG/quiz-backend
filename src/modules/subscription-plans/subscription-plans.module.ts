@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
-import { SubscriptionPlansService } from './subscription-plans.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { SubscriptionPlan } from './entities/subscription-plan.entity';
 import { SubscriptionPlansController } from './subscription-plans.controller';
+import { SubscriptionPlansService } from './subscription-plans.service';
 
 @Module({
+  imports: [TypeOrmModule.forFeature([SubscriptionPlan])],
   controllers: [SubscriptionPlansController],
   providers: [SubscriptionPlansService],
 })

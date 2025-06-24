@@ -80,7 +80,7 @@ export class SubscriptionPlansService {
         duration,
       });
     }
-    queryBuilder.orderBy('subscriptionPlans.durationDays', 'ASC');
+    queryBuilder.orderBy('subscriptionPlans.duration', 'ASC');
     const skip = (page - 1) * limit;
     queryBuilder.skip(skip).take(limit);
     const [data, totalItems] = await queryBuilder.getManyAndCount();
@@ -100,7 +100,7 @@ export class SubscriptionPlansService {
     const activeSubscriptionplans = await this.subscriptionPlanRepository
       .createQueryBuilder('subscriptionPlan')
       .where('subscriptionPlan.isActive = :status', { status: true })
-      .orderBy('subscriptionPlan.durationDays', 'ASC')
+      .orderBy('subscriptionPlan.duration', 'ASC')
       .getMany();
 
     return {

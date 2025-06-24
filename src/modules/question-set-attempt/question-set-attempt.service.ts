@@ -19,6 +19,8 @@ import { QuestionStats } from '../question-stats/entities/question-stat.entity';
 import { QuestionAttemptDto } from './dto/question-attempt.dto';
 import { ReviewAnswerDto } from './dto/review-answer.dto copy';
 
+const questionSetAttemptStatuses = ['pending', 'in_review', 'completed'];
+
 @Injectable()
 export class QuestionSetAttemptService {
   constructor(
@@ -158,20 +160,67 @@ export class QuestionSetAttemptService {
   }
 
   // Question Set Attempts per student
-  async getQuestionSetAttempts() {
+  async getQuestionSetAttempts(
+    page: number,
+    limit: number,
+    search?: string,
+    status?: string,
+  ) {
     const user = this.request.user;
-    const questionSetAttempts = await this.questionSetAttemptsRepository
+
+    const skip = (page - 1) * limit;
+
+    const query = this.questionSetAttemptsRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
       .where('questionSetAttempt.userId = :userId', { userId: user?.sub })
       .orderBy('questionSetAttempt.completedAt', 'DESC')
-      .getMany();
+      .skip(skip)
+      .take(limit);
+
+    if (search) {
+      query.andWhere('questionSet.name ILIKE :search', { search });
+    }
+
+    if (questionSetAttemptStatuses.includes(status)) {
+      if (status === 'pending') {
+        query.andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+          isCompleted: false,
+        });
+      }
+
+      if (status === 'in_review') {
+        query
+          .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+            isCompleted: true,
+          })
+          .andWhere('questionSetAttempt.isChecked = :isChecked', {
+            isChecked: false,
+          });
+      }
+
+      if (status === 'completed') {
+        query
+          .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
+            isCompleted: true,
+          })
+          .andWhere('questionSetAttempt.isChecked = :isChecked', {
+            isChecked: true,
+          });
+      }
+    }
+
+    const [data, totalItems] = await query.getManyAndCount();
 
     return {
       success: true,
-      message: 'Question attempts fetched successful.',
-      data: questionSetAttempts,
+      message: 'Question set attempts retrieved successful.',
+      data,
+      totalItems,
+      totalPages: Math.ceil(totalItems / limit),
+      currentPage: page,
+      pageSize: limit,
     };
   }
 

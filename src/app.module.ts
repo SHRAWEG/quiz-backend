@@ -30,6 +30,7 @@ import { QuestionsModule } from './modules/questions/questions.module';
 import { SubSubjectsModule } from './modules/sub-subjects/sub-subjects.module';
 import { SubjectsModule } from './modules/subjects/subjects.module';
 import { SubscriptionPlansModule } from './modules/subscription-plans/subscription-plans.module';
+import { UserSubscriptionsModule } from './modules/user-subscriptions/user-subscriptions.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -72,6 +73,7 @@ import { UsersModule } from './modules/users/users.module';
     QuestionAttemptModule,
     QuestionStatsModule,
     SubscriptionPlansModule,
+    UserSubscriptionsModule,
     CronTaskModule,
   ],
   controllers: [],
