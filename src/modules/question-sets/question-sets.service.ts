@@ -12,6 +12,7 @@ import { Request } from 'express';
 import { Role } from 'src/common/enums/roles.enum';
 import { Repository } from 'typeorm';
 import { Question } from '../questions/entities/question.entity';
+import { User } from '../users/entities/user.entity';
 import { AddQuestionDto } from './dto/add-question-dto';
 import { CreateQuestionSetDto } from './dto/create-question-set.dto';
 import { UpdateQuestionSetDto } from './dto/update-question-set.dto';
@@ -24,6 +25,8 @@ export class QuestionSetsService {
     private readonly questionSetRepository: Repository<QuestionSet>,
     @InjectRepository(Question)
     private readonly questionRepository: Repository<Question>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @Inject(REQUEST) private readonly request: Request,
   ) {}
 
@@ -315,7 +318,16 @@ export class QuestionSetsService {
   ) {
     const user = this.request.user;
     const skip = (page - 1) * limit;
-    console.log('QUETION SETS TO ATTEPT');
+
+    const userWithPrefs = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.preferredCategories', 'preferredCategory')
+      .where('user.id = :userId', { userId: user.sub })
+      .getOne();
+
+    const preferredCategoryIds =
+      userWithPrefs?.preferredCategories?.map((c) => c.id) ?? [];
+
     const query = this.questionSetRepository
       .createQueryBuilder('questionSet')
       .loadRelationCountAndMap(
@@ -340,10 +352,7 @@ export class QuestionSetsService {
       )
       .where('questionSet.status = :status', {
         status: QuestionSetStatus.PUBLISHED,
-      })
-      .orderBy('questionSet.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit);
+      });
 
     if (search) {
       query.andWhere('questionSet.name ILIKE :search', {
@@ -355,6 +364,19 @@ export class QuestionSetsService {
         categoryId: categoryId,
       });
     }
+
+    if (preferredCategoryIds.length > 0) {
+      query.addOrderBy(
+        `CASE 
+        WHEN questionSet.categoryId IN (:...preferredCategoryIds) THEN 0 
+        ELSE 1 
+      END`,
+        'ASC',
+      );
+    }
+
+    query.addOrderBy('questionSet.createdAt', 'DESC');
+    query.skip(skip).take(limit);
 
     const [data, totalItems] = await query.getManyAndCount();
 

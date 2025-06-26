@@ -16,8 +16,10 @@ import {
   ValidationException,
 } from 'src/common/exceptions/validation.exception';
 import { DataSource, ILike, Repository } from 'typeorm';
+import { Category } from '../categories/entities/category.entity';
 import { EmailService } from '../email/email.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { SetUserPreferencesDto } from './dto/save-user-preference.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { VerificationToken } from './entities/verification-token.entity';
@@ -26,6 +28,7 @@ import { VerificationToken } from './entities/verification-token.entity';
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(User) private readonly categoryRepo: Repository<Category>,
     private readonly dataSource: DataSource,
     @InjectRepository(VerificationToken)
     private readonly verificationTokenRepo: Repository<VerificationToken>,
@@ -232,6 +235,34 @@ export class UsersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  // In user.service.ts or a dedicated preferences service
+  async setUserPreferences(dto: SetUserPreferencesDto) {
+    const currentUser = this.request.user;
+    const user = await this.userRepo.findOne({
+      where: { id: currentUser.sub },
+      relations: ['preferredCategories'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const categories = await this.categoryRepo.findByIds(dto.categoryIds);
+
+    if (categories.length !== dto.categoryIds.length) {
+      throw new BadRequestException('One or more categories are invalid');
+    }
+
+    user.preferredCategories = categories;
+    await this.userRepo.save(user);
+
+    return {
+      success: true,
+      message: 'Preferences saved successfully',
+      data: categories,
+    };
   }
 
   async seedAdmin(): Promise<void> {

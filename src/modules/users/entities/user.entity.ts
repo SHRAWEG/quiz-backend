@@ -1,8 +1,11 @@
 import { Role } from 'src/common/enums/roles.enum';
+import { Category } from 'src/modules/categories/entities/category.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinTable,
+  ManyToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -49,4 +52,18 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @ManyToMany(() => Category)
+  @JoinTable({
+    name: 'user_preferred_categories',
+    joinColumn: {
+      name: 'user_id',
+      referencedColumnName: 'id',
+    },
+    inverseJoinColumn: {
+      name: 'category_id',
+      referencedColumnName: 'id',
+    },
+  })
+  preferredCategories: Category[];
 }
