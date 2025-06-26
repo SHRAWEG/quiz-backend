@@ -20,4 +20,11 @@ export class UserSubscriptionsController {
     console.log('Subscription Plan ID:', subscriptionPlanId);
     return await this.userSubscriptionsService.checkout(subscriptionPlanId);
   }
+
+  @Post('/updatePayment/:data')
+  @Roles(Role.STUDENT)
+  async updatePayment(@Param('data') data: string) {
+    console.log('Subscription Plan ID:', data);
+    return await this.userSubscriptionsService.updatePaymentStatus(data);
+  }
 }
