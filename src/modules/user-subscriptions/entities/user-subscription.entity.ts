@@ -11,8 +11,8 @@ import {
 
 export enum SubscriptionPaymentStatus {
   PENDING = 'PENDING',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED',
+  COMPLETE = 'COMPLETE',
+  CANCELED = 'CANCELED',
 }
 
 export enum PaymentMethod {
@@ -48,13 +48,13 @@ export class UserSubscription {
   isActive: boolean;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  total_amount: number; // NPR})
+  totalAmount: number; // NPR})
 
   @Column({ type: 'text' })
-  product_code: string;
+  productCode: string;
 
   @Column({ type: 'uuid' })
-  transaction_uuid: string; // Unique identifier for the transaction
+  transactionUuid: string; // Unique identifier for the transaction
 
   @Column({ type: 'text' })
   signature: string; // Signature for transaction verification
