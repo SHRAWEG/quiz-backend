@@ -1,19 +1,24 @@
 import {
+  BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
+import { Request } from 'express';
 import { ApiResponse } from 'src/common/classes/api-response';
 import { Role } from 'src/common/enums/roles.enum';
 import {
   ValidationError,
   ValidationException,
 } from 'src/common/exceptions/validation.exception';
-import { ILike, Repository } from 'typeorm';
+import { DataSource, ILike, Repository } from 'typeorm';
 import { EmailService } from '../email/email.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { VerificationToken } from './entities/verification-token.entity';
 
@@ -21,9 +26,11 @@ import { VerificationToken } from './entities/verification-token.entity';
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    private readonly dataSource: DataSource,
     @InjectRepository(VerificationToken)
     private readonly verificationTokenRepo: Repository<VerificationToken>,
     private readonly emailService: EmailService,
+    @Inject(REQUEST) private readonly request: Request,
   ) {}
 
   // Utility method to find a user by their ID.
@@ -117,6 +124,114 @@ export class UsersService {
       message: 'User created successfully.',
       data: user,
     });
+  }
+
+  async updateUser(dto: UpdateUserDto): Promise<ApiResponse<object>> {
+    const userId = this.request.user.sub;
+    if (!userId) {
+      throw new BadRequestException('Unauthorized');
+    }
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const user = await queryRunner.manager
+        .getRepository(User)
+        .createQueryBuilder('user')
+        .where('user.id = :userId', { userId })
+        .getOne();
+
+      if (!user) throw new NotFoundException('User not found');
+
+      const validationErrors: Record<string, string[]> = {};
+
+      // ✅ Email uniqueness check
+      if (dto.email && dto.email !== user.email) {
+        const existingEmailUser = await this.userRepo.findOneBy({
+          email: dto.email,
+        });
+        if (existingEmailUser) {
+          validationErrors['email'] = ['Email already exists'];
+        }
+      }
+
+      // ✅ Phone uniqueness check
+      if (dto.phone && dto.phone !== user.phone) {
+        const existingPhoneUser = await this.userRepo.findOneBy({
+          phone: dto.phone,
+        });
+        if (existingPhoneUser) {
+          validationErrors['phone'] = ['Phone already exists'];
+        }
+      }
+
+      if (Object.keys(validationErrors).length > 0) {
+        throw new ValidationException(validationErrors);
+      }
+
+      // ✅ Password update check
+      if (dto.oldPassword || dto.newPassword || dto.confirmNewPassword) {
+        if (!dto.oldPassword || !dto.newPassword || !dto.confirmNewPassword) {
+          throw new BadRequestException(
+            'All password fields are required to change password.',
+          );
+        }
+
+        const isOldPasswordValid = await argon2.verify(
+          user.password,
+          dto.oldPassword,
+        );
+        if (!isOldPasswordValid) {
+          throw new BadRequestException('Old password is incorrect.');
+        }
+
+        if (dto.newPassword !== dto.confirmNewPassword) {
+          throw new BadRequestException('New passwords do not match.');
+        }
+
+        // Hash new password
+        user.password = await argon2.hash(dto.newPassword);
+        await queryRunner.manager.save(user);
+      }
+
+      // ✅ Prepare update fields
+      const updateFields: Partial<User> = {};
+      if (dto.firstName !== undefined) updateFields.firstName = dto.firstName;
+      if (dto.middleName !== undefined)
+        updateFields.middleName = dto.middleName;
+      if (dto.lastName !== undefined) updateFields.lastName = dto.lastName;
+      if (dto.email !== undefined) updateFields.email = dto.email;
+      if (dto.phone !== undefined) updateFields.phone = dto.phone;
+
+      // ✅ Update user
+      if (Object.keys(updateFields).length > 0) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .update(User)
+          .set(updateFields)
+          .where('id = :userId', { userId })
+          .execute();
+      }
+
+      await queryRunner.commitTransaction();
+
+      const updatedUser = await this.userRepo.findOneBy({ id: userId });
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...safeUser } = updatedUser;
+
+      return new ApiResponse({
+        success: true,
+        message: 'User updated successfully.',
+        data: safeUser,
+      });
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      console.log(err);
+      throw new BadRequestException('User update failed');
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async seedAdmin(): Promise<void> {
