@@ -60,7 +60,7 @@ export class CategoriesController {
   }
 
   @Get('search')
-  @Roles(Role.ADMIN, Role.TEACHER)
+  @Roles(Role.ADMIN, Role.TEACHER, Role.STUDENT)
   @ApiQuery({
     name: 'search',
     required: false,

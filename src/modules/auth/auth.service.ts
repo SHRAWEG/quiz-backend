@@ -76,7 +76,8 @@ export class AuthService {
         accessToken,
         email: user.email,
         role: user.role,
-        name: `${user.firstName} ${user.middleName} ${user.lastName}`,
+        name: `${user.firstName} ${user.middleName ?? ''} ${user.lastName}`,
+        hasPreference: user.preferredCategories.length > 0,
       },
     });
   }
