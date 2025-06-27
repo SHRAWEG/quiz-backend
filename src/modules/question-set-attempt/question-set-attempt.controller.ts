@@ -135,6 +135,11 @@ export class QuestionSetAttemptController {
     );
   }
 
+  @Get('/leaderboard')
+  async getQuestionSetAttemptLeaderboard() {
+    return await this.questionSetAttemptService.getQuestionSetAttemptLeaderboard();
+  }
+
   // Submit an answer (could be in QuestionAttemptsController ideally)
   @Post('/answer/:questionSetAttemptId')
   async answerQuestion(

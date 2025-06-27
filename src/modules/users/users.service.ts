@@ -15,9 +15,11 @@ import {
   ValidationError,
   ValidationException,
 } from 'src/common/exceptions/validation.exception';
-import { DataSource, ILike, Repository } from 'typeorm';
+import { DataSource, ILike, In, Repository } from 'typeorm';
+import { Category } from '../categories/entities/category.entity';
 import { EmailService } from '../email/email.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { SetUserPreferencesDto } from './dto/save-user-preference.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { VerificationToken } from './entities/verification-token.entity';
@@ -26,11 +28,13 @@ import { VerificationToken } from './entities/verification-token.entity';
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
-    private readonly dataSource: DataSource,
+    @InjectRepository(Category)
+    private readonly categoryRepo: Repository<Category>,
     @InjectRepository(VerificationToken)
     private readonly verificationTokenRepo: Repository<VerificationToken>,
     private readonly emailService: EmailService,
     @Inject(REQUEST) private readonly request: Request,
+    private readonly dataSource: DataSource,
   ) {}
 
   // Utility method to find a user by their ID.
@@ -232,6 +236,57 @@ export class UsersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async setUserPreferences(dto: SetUserPreferencesDto) {
+    const currentUser = this.request.user;
+
+    const user = await this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.preferredCategories', 'preferredCategories')
+      .where('user.id = :id', { id: currentUser.sub })
+      .getOne();
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const newCategories = await this.categoryRepo.findBy({
+      id: In(dto.categoryIds),
+    });
+
+    if (newCategories.length !== dto.categoryIds.length) {
+      throw new BadRequestException(
+        'One or more provided category IDs are invalid.',
+      );
+    }
+
+    if (user.preferredCategories && user.preferredCategories.length > 0) {
+      await this.dataSource
+        .createQueryBuilder()
+        .relation(User, 'preferredCategories')
+        .of(user)
+        .remove(user.preferredCategories);
+    }
+
+    if (newCategories.length > 0) {
+      await this.dataSource
+        .createQueryBuilder()
+        .relation(User, 'preferredCategories')
+        .of(user)
+        .add(newCategories);
+    }
+
+    const updatedUser = await this.userRepo.findOne({
+      where: { id: currentUser.sub },
+      relations: ['preferredCategories'],
+    });
+
+    return {
+      success: true,
+      message: 'Preferences saved successfully',
+      data: updatedUser.preferredCategories, // Return the newly set categories
+    };
   }
 
   async seedAdmin(): Promise<void> {
