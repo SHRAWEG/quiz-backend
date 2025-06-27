@@ -25,7 +25,7 @@ const questionSetAttemptStatuses = ['pending', 'in_review', 'completed'];
 export class QuestionSetAttemptService {
   constructor(
     @InjectRepository(QuestionSetAttempt)
-    private readonly questionSetAttemptsRepository: Repository<QuestionSetAttempt>,
+    private readonly questionSetAttemptRepository: Repository<QuestionSetAttempt>,
     @InjectRepository(QuestionAttempt)
     private readonly questionAttemptRepository: Repository<QuestionAttempt>,
     private readonly dataSource: DataSource,
@@ -170,7 +170,7 @@ export class QuestionSetAttemptService {
 
     const skip = (page - 1) * limit;
 
-    const query = this.questionSetAttemptsRepository
+    const query = this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
@@ -227,7 +227,7 @@ export class QuestionSetAttemptService {
   // Question Set Attempt for student
   async getQuestionSetAttemptById(questionSetAttemptId: string) {
     const user = this.request.user;
-    const questionSetAttempt = await this.questionSetAttemptsRepository
+    const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
@@ -278,7 +278,7 @@ export class QuestionSetAttemptService {
   // Report of the completed question set attempt
   async getQuestionSetAttemptReportById(questionSetAttemptId: string) {
     const user = this.request.user;
-    const questionSetAttempt = await this.questionSetAttemptsRepository
+    const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
@@ -332,7 +332,7 @@ export class QuestionSetAttemptService {
       (currentAttemptScore / totalPossibleScore) * 100;
 
     // 2. Fetch all completed attempts for this specific questionSetId
-    const allCompletedAttemptsForSet = await this.questionSetAttemptsRepository
+    const allCompletedAttemptsForSet = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .select(['questionSetAttempt.score', 'questionSetAttempt.userId']) // Only select score and userId
       .where('questionSetAttempt.questionSetId = :questionSetId', {
@@ -447,7 +447,7 @@ export class QuestionSetAttemptService {
     const user = this.request.user;
     const now = new Date();
 
-    const questionSetAttempt = await this.questionSetAttemptsRepository
+    const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
@@ -682,7 +682,7 @@ export class QuestionSetAttemptService {
   // Service to mark the question set attempt as completed
   async finishQuiz(questionSetAttemptId: string) {
     const user = this.request.user;
-    const questionSetAttempt = await this.questionSetAttemptsRepository
+    const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
@@ -726,7 +726,7 @@ export class QuestionSetAttemptService {
       total > 0 ? (correctCount / total) * 100 : 0;
     questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : true;
 
-    await this.questionSetAttemptsRepository.save(questionSetAttempt);
+    await this.questionSetAttemptRepository.save(questionSetAttempt);
 
     return {
       success: true,
@@ -787,7 +787,7 @@ export class QuestionSetAttemptService {
   */
   // List of all the completed but unchecked question set attempts
   async getQuestionSetAttemptsToReview() {
-    const questionSetAttempts = await this.questionSetAttemptsRepository
+    const questionSetAttempts = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
@@ -809,7 +809,7 @@ export class QuestionSetAttemptService {
 
   // Question set attempt to review (To check/ review answers in the question sets that are long or short typed)
   async getQuestionSetAttemptToReviewById(questionSetAttemptId: string) {
-    const questionSetAttempt = await this.questionSetAttemptsRepository
+    const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
@@ -1049,7 +1049,7 @@ export class QuestionSetAttemptService {
 
   // Mark isChecked , marking if the checking of the question set attempt is completed
   async markIsChecked(questionSetAttemptId: string) {
-    const questionSetAttempt = await this.questionSetAttemptsRepository
+    const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
@@ -1082,12 +1082,43 @@ export class QuestionSetAttemptService {
     }
 
     questionSetAttempt.isChecked = true;
-    await this.questionSetAttemptsRepository.save(questionSetAttempt);
+    await this.questionSetAttemptRepository.save(questionSetAttempt);
 
     return {
       success: true,
       message: 'Question set attempt marked as checked.',
       data: { questionSetAttemptId },
+    };
+  }
+
+  async getQuestionSetAttemptLeaderboard() {
+    interface LeaderboardRow {
+      userId: string;
+      userName: string;
+      totalAttempts: string; // because COUNT(*) comes back as a string from SQL
+    }
+    const result = await this.questionSetAttemptRepository
+      .createQueryBuilder('questionSetAttempt')
+      .innerJoin('questionSetAttempt.user', 'user')
+      .select([
+        'user.id AS userId',
+        'user.name AS userName',
+        'COUNT(*) AS totalAttempts',
+      ])
+      .where('questionSetAttempt.isCompleted = :completed', { completed: true }) // optional filter
+      .groupBy('user.id')
+      .addGroupBy('user.name')
+      .orderBy('totalAttempts', 'DESC')
+      .limit(10)
+      .getRawMany<LeaderboardRow>();
+    return {
+      success: true,
+      message: 'Question set attempt marked as checked.',
+      data: result.map((row) => ({
+        userId: row.userId,
+        name: row.userName,
+        totalAttempts: Number(row.totalAttempts),
+      })),
     };
   }
 }

@@ -7,6 +7,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { SetUserPreferencesDto } from './dto/save-user-preference.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('users')
 export class UsersController {
@@ -24,6 +25,7 @@ export class UsersController {
 
   @Patch('preferences')
   @UseGuards(AuthGuard, RolesGuard)
+  @ApiBearerAuth()
   @Roles(Role.STUDENT)
   async setPreferences(@Body() dto: SetUserPreferencesDto) {
     return this.usersService.setUserPreferences(dto);

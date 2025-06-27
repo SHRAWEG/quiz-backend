@@ -319,6 +319,7 @@ export class QuestionSetsService {
     const user = this.request.user;
     const skip = (page - 1) * limit;
 
+    // Get user with preferred categories
     const userWithPrefs = await this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.preferredCategories', 'preferredCategory')
@@ -328,67 +329,105 @@ export class QuestionSetsService {
     const preferredCategoryIds =
       userWithPrefs?.preferredCategories?.map((c) => c.id) ?? [];
 
-    const query = this.questionSetRepository
-      .createQueryBuilder('questionSet')
-      .loadRelationCountAndMap(
-        'questionSet.questionsCount',
-        'questionSet.questions',
-      )
-      .leftJoinAndSelect('questionSet.category', 'category')
-      // ✅ Count ALL attempts on the question set
-      .loadRelationCountAndMap(
-        'questionSet.questionSetAttempts',
-        'questionSet.questionSetAttempts',
-      )
-      // ✅ Count only current user's attempts
-      .loadRelationCountAndMap(
-        'questionSet.userQuestionSetAttempts',
-        'questionSet.questionSetAttempts',
-        'userAttempts',
-        (qb) =>
-          qb.andWhere('userAttempts.userId = :userId', {
-            userId: user?.sub,
-          }),
-      )
-      .where('questionSet.status = :status', {
-        status: QuestionSetStatus.PUBLISHED,
-      });
+    // Base query builder function
+    const buildBaseQuery = () => {
+      const baseQuery = this.questionSetRepository
+        .createQueryBuilder('questionSet')
+        .leftJoinAndSelect('questionSet.category', 'category')
+        .loadRelationCountAndMap(
+          'questionSet.questionsCount',
+          'questionSet.questions',
+        )
+        .loadRelationCountAndMap(
+          'questionSet.totalAttempts',
+          'questionSet.questionSetAttempts',
+        )
+        .loadRelationCountAndMap(
+          'questionSet.userAttemptsCount',
+          'questionSet.questionSetAttempts',
+          'userAttempts',
+          (qb) =>
+            qb.andWhere('userAttempts.userId = :userId', {
+              userId: user.sub,
+            }),
+        )
+        .where('questionSet.status = :status', {
+          status: QuestionSetStatus.PUBLISHED,
+        });
 
-    if (search) {
-      query.andWhere('questionSet.name ILIKE :search', {
-        search: `%${search}%`,
-      });
-    }
-    if (categoryId) {
-      query.andWhere('questionSet.categoryId = :categoryId', {
-        categoryId: categoryId,
-      });
-    }
+      // Apply search filter
+      if (search) {
+        baseQuery.andWhere('questionSet.name ILIKE :search', {
+          search: `%${search}%`,
+        });
+      }
 
-    if (preferredCategoryIds.length > 0) {
-      query.addOrderBy(
-        `CASE 
-        WHEN questionSet.categoryId IN (:...preferredCategoryIds) THEN 0 
-        ELSE 1 
-      END`,
-        'ASC',
-      );
-    }
+      // Apply category filter
+      if (categoryId) {
+        baseQuery.andWhere('questionSet.categoryId = :categoryId', {
+          categoryId: categoryId,
+        });
+      }
 
-    query.addOrderBy('questionSet.createdAt', 'DESC');
-    query.skip(skip).take(limit);
-
-    const [data, totalItems] = await query.getManyAndCount();
-
-    return {
-      success: true,
-      message: 'Question Sets for Quiz/Test retrieved successfully',
-      data,
-      totalItems,
-      totalPages: Math.ceil(totalItems / limit),
-      currentPage: page,
-      pageSize: limit,
+      return baseQuery;
     };
+
+    // If user has preferred categories, fetch in two separate queries and combine
+    if (preferredCategoryIds.length > 0) {
+      // Query 1: Get preferred category question sets
+      const preferredQuery = buildBaseQuery()
+        .andWhere('questionSet.categoryId IN (:...preferredIds)', {
+          preferredIds: preferredCategoryIds,
+        })
+        .orderBy('questionSet.createdAt', 'DESC');
+
+      // Query 2: Get non-preferred category question sets
+      const nonPreferredQuery = buildBaseQuery()
+        .andWhere('questionSet.categoryId NOT IN (:...preferredIds)', {
+          preferredIds: preferredCategoryIds,
+        })
+        .orderBy('questionSet.createdAt', 'DESC');
+
+      // Get total count first
+      const totalQuery = buildBaseQuery();
+      const totalItems = await totalQuery.getCount();
+
+      // Calculate how many from each query we need based on pagination
+      const [preferredData, nonPreferredData] = await Promise.all([
+        preferredQuery.getMany(),
+        nonPreferredQuery.getMany(),
+      ]);
+
+      // Combine and paginate manually
+      const combinedData = [...preferredData, ...nonPreferredData];
+      const paginatedData = combinedData.slice(skip, skip + limit);
+
+      return {
+        success: true,
+        message: 'Question Sets for Quiz/Test retrieved successfully',
+        data: paginatedData,
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+      };
+    } else {
+      // No preferred categories, use simple query
+      const query = buildBaseQuery().orderBy('questionSet.createdAt', 'DESC');
+
+      query.skip(skip).take(limit);
+      const [data, totalItems] = await query.getManyAndCount();
+
+      return {
+        success: true,
+        message: 'Question Sets for Quiz/Test retrieved successfully',
+        data,
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+      };
+    }
   }
 
   async getQuestionSetToAttempt(id: string) {
