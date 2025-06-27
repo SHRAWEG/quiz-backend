@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -13,9 +14,13 @@ import {
   QuestionSet,
   QuestionSetStatus,
 } from 'src/modules/question-sets/entities/question-set.entity';
-import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { DataSource, MoreThan, QueryRunner, Repository } from 'typeorm';
 import { QuestionAttempt } from '../question-attempt/entities/question-attempt.entity';
 import { QuestionStats } from '../question-stats/entities/question-stat.entity';
+import {
+  SubscriptionPaymentStatus,
+  UserSubscription,
+} from '../user-subscriptions/entities/user-subscription.entity';
 import { QuestionAttemptDto } from './dto/question-attempt.dto';
 import { ReviewAnswerDto } from './dto/review-answer.dto copy';
 
@@ -28,6 +33,8 @@ export class QuestionSetAttemptService {
     private readonly questionSetAttemptsRepository: Repository<QuestionSetAttempt>,
     @InjectRepository(QuestionAttempt)
     private readonly questionAttemptRepository: Repository<QuestionAttempt>,
+    @InjectRepository(UserSubscription)
+    private readonly userSubscriptionRepository: Repository<UserSubscription>,
     private readonly dataSource: DataSource,
     @Inject(REQUEST) private readonly request: Request,
   ) {}
@@ -38,6 +45,7 @@ export class QuestionSetAttemptService {
   */
   async startQuestionSetAttempt(questionSetId: string) {
     const user = this.request.user;
+
     // INITIALIZING AND STARTING THE DB TRANSACTION
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -68,6 +76,25 @@ export class QuestionSetAttemptService {
         throw new NotFoundException({
           success: false,
           message: 'Question Set not found to start quiz.',
+          data: null,
+        });
+      }
+
+      const subscription = await this.userSubscriptionRepository.findOne({
+        where: {
+          userId: user.sub,
+          isActive: true,
+          paymentStatus: SubscriptionPaymentStatus.COMPLETE,
+          expiresAt: MoreThan(new Date()), // Only not expired subscriptions
+        },
+        order: { createdAt: 'DESC' }, // Get the most recent
+        relations: ['plan'],
+      });
+
+      if (!subscription && !questionSet.isFree) {
+        throw new ForbiddenException({
+          success: false,
+          message: 'You need to subscribe to access premium question sets.',
           data: null,
         });
       }
