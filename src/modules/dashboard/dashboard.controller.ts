@@ -1,4 +1,5 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/role.decorator';
 import { Role } from 'src/common/enums/roles.enum';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -7,6 +8,7 @@ import { DashboardService } from './dashboard.service';
 
 @Controller('dashboard')
 @UseGuards(AuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 

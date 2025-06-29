@@ -54,7 +54,7 @@ export class DashboardService {
 
     const totalQuestionSetAttempts = await questionSetAttemptQuery.getCount();
 
-    const averageQuestionsPerTeacher = await this.questionRepo
+    const averageQuestionsPerTeacherRaw = await this.questionRepo
       .createQueryBuilder('outer')
       .select('AVG(sub.count)', 'avg')
       .from((subQb) => {
@@ -65,6 +65,10 @@ export class DashboardService {
           .groupBy('question.createdById');
       }, 'sub')
       .getRawOne<{ avg: string }>();
+    const averageQuestionsPerTeacher = parseFloat(
+      averageQuestionsPerTeacherRaw?.avg ?? '0',
+    );
+
     return {
       success: 'true',
       data: {
