@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Request } from 'express';
 import { Role } from 'src/common/enums/roles.enum';
 import { Repository } from 'typeorm';
 import { QuestionSetAttempt } from '../question-set-attempt/entities/question-set-attempt.entity';
@@ -16,7 +18,8 @@ export class DashboardService {
     private readonly questionRepo: Repository<Question>,
 
     @InjectRepository(QuestionSetAttempt)
-    private readonly questionSetAttmptRepo: Repository<QuestionSetAttempt>,
+    private readonly questionSetAttemptRepo: Repository<QuestionSetAttempt>,
+    @Inject(REQUEST) private readonly request: Request,
   ) {}
 
   async getAdminDashboard() {
@@ -26,7 +29,7 @@ export class DashboardService {
 
     const userQuery = this.userRepo.createQueryBuilder('user');
     const questionSetAttemptQuery =
-      this.questionSetAttmptRepo.createQueryBuilder('questionSetAttempt');
+      this.questionSetAttemptRepo.createQueryBuilder('questionSetAttempt');
 
     const totalStudents = await userQuery
       .where('user.role = :role', { role: Role.STUDENT })
@@ -79,6 +82,85 @@ export class DashboardService {
         totalQuestionSetAttempts,
         averageQuestionsPerTeacher,
       },
+    };
+  }
+
+  async getStudentDashboard() {
+    const user = this.request.user;
+
+    const questionSetAttemptQuery =
+      this.questionSetAttemptRepo.createQueryBuilder('questionSetAttempt');
+
+    // ✅ Total attempts
+    const totalAttempts = await questionSetAttemptQuery
+      .clone()
+      .where('questionSetAttempt.userId = :userId', { userId: user.sub })
+      .getCount();
+
+    // ✅ Completed attempts
+    const completedCount = await questionSetAttemptQuery
+      .clone()
+      .where('questionSetAttempt.userId = :userId', { userId: user.sub })
+      .andWhere('questionSetAttempt.isCompleted = true')
+      .getCount();
+
+    // ✅ Incomplete attempts
+    const incompleteCount = await questionSetAttemptQuery
+      .clone()
+      .where('questionSetAttempt.userId = :userId', { userId: user.sub })
+      .andWhere('questionSetAttempt.isCompleted = false')
+      .getCount();
+
+    // ✅ Total time spent in seconds
+    const totalTimeResult = await questionSetAttemptQuery
+      .clone()
+      .select(
+        `SUM(EXTRACT(EPOCH FROM ("questionSetAttempt"."completed_at" - "questionSetAttempt"."started_at")))`,
+        'totalTime',
+      )
+      .where('"questionSetAttempt"."user_id" = :userId', { userId: user.sub })
+      .andWhere('"questionSetAttempt"."is_completed" = true')
+      .getRawOne<{ totalTime: string }>();
+
+    const totalTimeInSeconds = parseFloat(totalTimeResult?.totalTime || '0');
+
+    return {
+      totalQuizzesAttempted: totalAttempts,
+      completedQuizzes: completedCount,
+      incompleteQuizzes: incompleteCount,
+      timeSpentInSeconds: totalTimeInSeconds,
+    };
+  }
+
+  async getTeacherDashboard() {
+    const user = this.request.user;
+
+    const questionQuery = this.questionRepo.createQueryBuilder('question');
+
+    // ✅ Total questions authored
+    const totalAuthored = await questionQuery
+      .clone()
+      .where('question.created_by_id = :teacherId', { teacherId: user.sub })
+      .getCount();
+
+    // ✅ Total questions used in question sets
+    const usedInQuestionSets = await questionQuery
+      .clone()
+      .innerJoin('question.questionSets', 'qs')
+      .where('question.created_by_id = :teacherId', { teacherId: user.sub })
+      .getCount();
+
+    // ✅ Total approved questions filtered by status string
+    const approvedQuestions = await questionQuery
+      .clone()
+      .where('question.created_by_id = :teacherId', { teacherId: user.sub })
+      .andWhere('question.status = :status', { status: 'approved' })
+      .getCount();
+
+    return {
+      totalQuestionsAuthored: totalAuthored,
+      totalUsedInQuestionSets: usedInQuestionSets,
+      totalApprovedQuestions: approvedQuestions,
     };
   }
 }

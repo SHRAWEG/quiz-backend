@@ -17,4 +17,16 @@ export class DashboardController {
   async getAdminDashboard() {
     return await this.dashboardService.getAdminDashboard();
   }
+
+  @Get('/student')
+  @Roles(Role.STUDENT)
+  async getStudentDashboard() {
+    return await this.dashboardService.getStudentDashboard();
+  }
+
+  @Get('/teacher')
+  @Roles(Role.TEACHER)
+  async getTeacherDashboard() {
+    return await this.dashboardService.getTeacherDashboard();
+  }
 }
