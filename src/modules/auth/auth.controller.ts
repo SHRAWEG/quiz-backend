@@ -5,15 +5,12 @@ import {
   Get,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { AuthUser } from 'src/common/decorators/auth-user.decorator';
+import { ApiQuery } from '@nestjs/swagger';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/update-auth.dto';
-import { AuthGuard } from './guards/auth.guard';
 
 interface ResendVerificationDto {
   email: string;
@@ -69,12 +66,5 @@ export class AuthController {
     return {
       message: 'Verification email sent successfully',
     };
-  }
-
-  @Get('profile')
-  @ApiBearerAuth()
-  @UseGuards(AuthGuard)
-  findUserDetails(@AuthUser('sub') userId: string) {
-    return this.authService.findUserDetails(userId);
   }
 }

@@ -68,6 +68,7 @@ export class UsersService {
       .where('users.email = :email', { email })
       .addSelect('users.password')
       .addSelect('users.isEmailVerified')
+      .leftJoinAndSelect('users.preferredCategories', 'preferredCategories')
       .getOne();
     if (!user) {
       return null;
@@ -236,6 +237,18 @@ export class UsersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async getUserPreferences() {
+    const user = this.request.user;
+
+    const preferences = await this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.preferredCategories', 'preferredCategories')
+      .where('user.id = :id', { id: user.sub })
+      .getOne();
+
+    return preferences.preferredCategories;
   }
 
   async setUserPreferences(dto: SetUserPreferencesDto) {

@@ -5,6 +5,7 @@ import { QuestionSet } from '../question-sets/entities/question-set.entity';
 import { QuestionStats } from '../question-stats/entities/question-stat.entity';
 import { Question } from '../questions/entities/question.entity';
 import { SubSubjectsModule } from '../sub-subjects/sub-subjects.module';
+import { UserSubscription } from '../user-subscriptions/entities/user-subscription.entity';
 import { UsersModule } from '../users/users.module';
 import { QuestionSetAttempt } from './entities/question-set-attempt.entity';
 import { QuestionSetAttemptController } from './question-set-attempt.controller';
@@ -18,6 +19,7 @@ import { QuestionSetAttemptService } from './question-set-attempt.service';
       QuestionAttempt,
       Question,
       QuestionStats,
+      UserSubscription,
     ]),
     UsersModule,
     SubSubjectsModule,

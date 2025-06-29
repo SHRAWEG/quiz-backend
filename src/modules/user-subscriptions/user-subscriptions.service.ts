@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'crypto-js';
 import { Request } from 'express';
 import { SubscriptionPlanDuration } from 'src/common/enums/subscription-plans.enum';
-import { In, Repository } from 'typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { SubscriptionPlansService } from '../subscription-plans/subscription-plans.service';
 import {
@@ -201,6 +201,32 @@ export class UserSubscriptionsService {
       success: true,
       message: `Payment status updated to ${subscription.paymentStatus}.`,
       data: subscription,
+    };
+  }
+
+  async getUserSubscriptionStatus(): Promise<{
+    isActive: boolean;
+    currentSubscription: UserSubscription | null;
+    expiresAt: Date | null;
+  }> {
+    const user = this.request.user as { sub: string };
+
+    // Find the most recent active subscription
+    const subscription = await this.userSubscriptionRepository.findOne({
+      where: {
+        userId: user.sub,
+        isActive: true,
+        paymentStatus: SubscriptionPaymentStatus.COMPLETE,
+        expiresAt: MoreThan(new Date()), // Only not expired subscriptions
+      },
+      order: { createdAt: 'DESC' }, // Get the most recent
+      relations: ['plan'],
+    });
+
+    return {
+      isActive: !!subscription,
+      currentSubscription: subscription || null,
+      expiresAt: subscription?.expiresAt || null,
     };
   }
 }
