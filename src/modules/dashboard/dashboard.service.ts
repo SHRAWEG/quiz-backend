@@ -125,10 +125,13 @@ export class DashboardService {
     const totalTimeInSeconds = parseFloat(totalTimeResult?.totalTime || '0');
 
     return {
-      totalQuizzesAttempted: totalAttempts,
-      completedQuizzes: completedCount,
-      incompleteQuizzes: incompleteCount,
-      timeSpentInSeconds: totalTimeInSeconds,
+      success: true,
+      data: {
+        totalQuestionSetsAttempted: totalAttempts,
+        completedQuestionSets: completedCount,
+        incompleteQuestionSets: incompleteCount,
+        timeSpentInSeconds: totalTimeInSeconds,
+      },
     };
   }
 
@@ -158,9 +161,12 @@ export class DashboardService {
       .getCount();
 
     return {
-      totalQuestionsAuthored: totalAuthored,
-      totalUsedInQuestionSets: usedInQuestionSets,
-      totalApprovedQuestions: approvedQuestions,
+      success: 'true',
+      data: {
+        totalQuestionsAuthored: totalAuthored,
+        totalUsedInQuestionSets: usedInQuestionSets,
+        totalApprovedQuestions: approvedQuestions,
+      },
     };
   }
 }
