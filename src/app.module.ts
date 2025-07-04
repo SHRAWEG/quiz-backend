@@ -21,6 +21,7 @@ import { CategoriesModule } from './modules/categories/category.module';
 import { Category } from './modules/categories/entities/category.entity';
 import { CreditModule } from './modules/credit/credit.module';
 import { CronTaskModule } from './modules/cron-task/cron-task.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { OptionsModule } from './modules/options/options.module';
 import { QuestionAttemptModule } from './modules/question-attempt/question-attempt.module';
 import { QuestionSetAttemptModule } from './modules/question-set-attempt/question-set-attempt.module';
@@ -77,6 +78,7 @@ import { UsersModule } from './modules/users/users.module';
     UserSubscriptionsModule,
     CronTaskModule,
     CreditModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [UsersService, EmailService],
