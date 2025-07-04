@@ -1,5 +1,3 @@
-// question-set.service.ts
-
 import {
   BadRequestException,
   Inject,
@@ -16,7 +14,12 @@ import { User } from '../users/entities/user.entity';
 import { AddQuestionDto } from './dto/add-question-dto';
 import { CreateQuestionSetDto } from './dto/create-question-set.dto';
 import { UpdateQuestionSetDto } from './dto/update-question-set.dto';
-import { QuestionSet, QuestionSetStatus } from './entities/question-set.entity';
+import { QuestionSetPurchase } from './entities/question-set-purchase.entity';
+import {
+  QuestionSet,
+  QuestionSetAccessType,
+  QuestionSetStatus,
+} from './entities/question-set.entity';
 
 @Injectable()
 export class QuestionSetsService {
@@ -27,43 +30,42 @@ export class QuestionSetsService {
     private readonly questionRepository: Repository<Question>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(QuestionSetPurchase)
+    private readonly questionSetPurchaseRepository: Repository<QuestionSetPurchase>,
     @Inject(REQUEST) private readonly request: Request,
   ) {}
 
-  // ACCESS : ADMIN
   async create(dto: CreateQuestionSetDto) {
     const user = this.request.user;
 
-    // Start a transaction for creating the QuestionSet and any related entries
     const queryRunner =
       this.questionSetRepository.manager.connection.createQueryRunner();
-
-    // Start the transaction
     await queryRunner.startTransaction();
+
     try {
-      // 1. Create the QuestionSet entity
       const questionSet = new QuestionSet();
       questionSet.name = dto.name;
-      questionSet.isFree = dto.isFree;
+      questionSet.accessType = dto.accessType;
+      questionSet.creditCost =
+        dto.accessType === QuestionSetAccessType.EXCLUSIVE
+          ? dto.creditCost
+          : null;
       questionSet.isTimeLimited = dto.isTimeLimited;
       questionSet.timeLimitSeconds = dto.timeLimitSeconds;
       questionSet.categoryId = dto.categoryId;
       questionSet.status = QuestionSetStatus.DRAFT;
       questionSet.createdById = user.sub;
 
-      // 2. Insert the QuestionSet
       const insertedQuestionSet = await queryRunner.manager
         .createQueryBuilder()
         .insert()
         .into(QuestionSet)
         .values(questionSet)
-        .returning('*') // Return the inserted data
+        .returning('*')
         .execute();
 
-      // Commit the transaction
       await queryRunner.commitTransaction();
 
-      // Retrieve the created QuestionSet with its questions (if any)
       const newQuestionSet = await queryRunner.manager
         .createQueryBuilder(QuestionSet, 'questionSet')
         .leftJoinAndSelect('questionSet.questions', 'q')
@@ -78,54 +80,44 @@ export class QuestionSetsService {
 
       return {
         success: true,
-        message: 'Question set created sucessfully',
+        message: 'Question set created successfully',
         data: newQuestionSet,
       };
     } catch (error) {
-      // If any error occurs, rollback the transaction
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
-      // Release the query runner after the transaction
       await queryRunner.release();
     }
   }
 
-  // ACCESS : ADMIN
   async addQuestion(dto: AddQuestionDto) {
-    // 1. Load the QuestionSet with its related Question IDs
     const questionSet = await this.questionSetRepository
       .createQueryBuilder('questionSet')
-      .leftJoinAndSelect('questionSet.questions', 'question') // This automatically joins the relation via the join table
+      .leftJoinAndSelect('questionSet.questions', 'question')
       .leftJoinAndSelect(
         'questionSet.questionSetAttempts',
         'questionSetAttempt',
       )
-      .leftJoinAndSelect('question.options', 'option')
       .where('questionSet.id = :id', { id: dto.questionSetId })
       .getOne();
 
     if (!questionSet) {
       throw new NotFoundException('Question set not found');
     }
-    if (
-      questionSet.questionSetAttempts &&
-      questionSet.questionSetAttempts.length > 0
-    ) {
+
+    if (questionSet.questionSetAttempts?.length > 0) {
       throw new BadRequestException(
         'Cannot add a question to the set that has been attempted.',
       );
     }
 
-    // 2. Check if the question is already linked
     if (questionSet?.questions?.some((q) => q.id === dto.questionId)) {
-      // Question with the given ID exists in the questionSet
       throw new BadRequestException(
         'The question is already in the question set',
       );
     }
 
-    // 3. Confirm the Question exists (optional, but good for safety)
     const question = await this.questionRepository
       .createQueryBuilder('q')
       .where('q.id = :id', { id: dto.questionId })
@@ -134,14 +126,12 @@ export class QuestionSetsService {
       throw new NotFoundException('Question not found');
     }
 
-    // 4. Insert into the join table manually using QueryBuilder
     await this.questionSetRepository
       .createQueryBuilder()
       .relation(QuestionSet, 'questions')
       .of(dto.questionSetId)
-      .add(dto.questionId); // Adds the relation
+      .add(dto.questionId);
 
-    // ✅ 5. Update the question set status to DRAFT
     await this.questionSetRepository.update(dto.questionSetId, {
       status: QuestionSetStatus.DRAFT,
     });
@@ -159,11 +149,9 @@ export class QuestionSetsService {
     };
   }
 
-  // ACCESS : ADMIN
   async removeQuestion(dto: AddQuestionDto) {
     const { questionSetId, questionId } = dto;
 
-    // 1. Load QuestionSet with its questions
     const questionSet = await this.questionSetRepository
       .createQueryBuilder('questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
@@ -178,22 +166,17 @@ export class QuestionSetsService {
       throw new NotFoundException('Question set not found');
     }
 
-    if (
-      questionSet.questionSetAttempts &&
-      questionSet.questionSetAttempts.length > 0
-    ) {
+    if (questionSet.questionSetAttempts?.length > 0) {
       throw new BadRequestException(
         'Cannot remove a question from the set that has been attempted.',
       );
     }
 
-    // 2. Check if question is actually linked
     const isLinked = questionSet.questions.some((q) => q.id === questionId);
     if (!isLinked) {
       throw new BadRequestException('Question is not part of the question set');
     }
 
-    // 3. Ensure the question exists
     const question = await this.questionRepository
       .createQueryBuilder('q')
       .where('q.id = :id', { id: questionId })
@@ -202,19 +185,16 @@ export class QuestionSetsService {
       throw new NotFoundException('Question not found');
     }
 
-    // 4. Remove the relation using QueryBuilder
     await this.questionSetRepository
       .createQueryBuilder()
       .relation(QuestionSet, 'questions')
       .of(questionSetId)
       .remove(questionId);
 
-    // ✅ 5. Update the question set status to DRAFT
     await this.questionSetRepository.update(dto.questionSetId, {
       status: QuestionSetStatus.DRAFT,
     });
 
-    // 5. Return updated question set with full question details
     const updatedQuestionSet = await this.questionSetRepository
       .createQueryBuilder('qs')
       .leftJoinAndSelect('qs.questions', 'q')
@@ -223,12 +203,11 @@ export class QuestionSetsService {
 
     return {
       success: true,
-      message: 'Question removed sucessfully',
+      message: 'Question removed successfully',
       data: updatedQuestionSet,
     };
   }
 
-  // ACCESS : ADMIN
   async get(
     page: number,
     limit: number,
@@ -288,9 +267,9 @@ export class QuestionSetsService {
         'user.email',
       ])
       .leftJoinAndSelect('question.options', 'option')
-      .leftJoinAndSelect('question.subject', 'subject') // join but not select
-      .leftJoin('question.subSubject', 'subSubject') // join but not select
-      .addSelect(['subSubject.id', 'subSubject.name']) // project only needed fields
+      .leftJoinAndSelect('question.subject', 'subject')
+      .leftJoin('question.subSubject', 'subSubject')
+      .addSelect(['subSubject.id', 'subSubject.name'])
       .where('questionSet.id = :id', { id });
 
     const questionSet = await query.getOne();
@@ -319,7 +298,6 @@ export class QuestionSetsService {
     const user = this.request.user;
     const skip = (page - 1) * limit;
 
-    // Get user with preferred categories
     const userWithPrefs = await this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.preferredCategories', 'preferredCategory')
@@ -329,7 +307,6 @@ export class QuestionSetsService {
     const preferredCategoryIds =
       userWithPrefs?.preferredCategories?.map((c) => c.id) ?? [];
 
-    // Base query builder function
     const buildBaseQuery = () => {
       const baseQuery = this.questionSetRepository
         .createQueryBuilder('questionSet')
@@ -342,27 +319,16 @@ export class QuestionSetsService {
           'questionSet.totalAttempts',
           'questionSet.questionSetAttempts',
         )
-        .loadRelationCountAndMap(
-          'questionSet.userAttemptsCount',
-          'questionSet.questionSetAttempts',
-          'userAttempts',
-          (qb) =>
-            qb.andWhere('userAttempts.userId = :userId', {
-              userId: user.sub,
-            }),
-        )
         .where('questionSet.status = :status', {
           status: QuestionSetStatus.PUBLISHED,
         });
 
-      // Apply search filter
       if (search) {
         baseQuery.andWhere('questionSet.name ILIKE :search', {
           search: `%${search}%`,
         });
       }
 
-      // Apply category filter
       if (categoryId) {
         baseQuery.andWhere('questionSet.categoryId = :categoryId', {
           categoryId: categoryId,
@@ -372,33 +338,25 @@ export class QuestionSetsService {
       return baseQuery;
     };
 
-    // If user has preferred categories, fetch in two separate queries and combine
     if (preferredCategoryIds.length > 0) {
-      // Query 1: Get preferred category question sets
       const preferredQuery = buildBaseQuery()
         .andWhere('questionSet.categoryId IN (:...preferredIds)', {
           preferredIds: preferredCategoryIds,
         })
         .orderBy('questionSet.createdAt', 'DESC');
 
-      // Query 2: Get non-preferred category question sets
       const nonPreferredQuery = buildBaseQuery()
         .andWhere('questionSet.categoryId NOT IN (:...preferredIds)', {
           preferredIds: preferredCategoryIds,
         })
         .orderBy('questionSet.createdAt', 'DESC');
 
-      // Get total count first
-      const totalQuery = buildBaseQuery();
-      const totalItems = await totalQuery.getCount();
-
-      // Calculate how many from each query we need based on pagination
+      const totalItems = await buildBaseQuery().getCount();
       const [preferredData, nonPreferredData] = await Promise.all([
         preferredQuery.getMany(),
         nonPreferredQuery.getMany(),
       ]);
 
-      // Combine and paginate manually
       const combinedData = [...preferredData, ...nonPreferredData];
       const paginatedData = combinedData.slice(skip, skip + limit);
 
@@ -412,9 +370,7 @@ export class QuestionSetsService {
         pageSize: limit,
       };
     } else {
-      // No preferred categories, use simple query
       const query = buildBaseQuery().orderBy('questionSet.createdAt', 'DESC');
-
       query.skip(skip).take(limit);
       const [data, totalItems] = await query.getManyAndCount();
 
@@ -450,12 +406,10 @@ export class QuestionSetsService {
       .leftJoinAndSelect('question.subject', 'subject')
       .leftJoin('question.subSubject', 'subSubject')
       .addSelect(['subSubject.id', 'subSubject.name'])
-      // ✅ Count ALL attempts on this question set
       .loadRelationCountAndMap(
         'questionSet.totalAttempts',
         'questionSet.questionSetAttempts',
       )
-      // ✅ Count attempts made by the current user
       .loadRelationCountAndMap(
         'questionSet.userAttemptCount',
         'questionSet.questionSetAttempts',
@@ -465,7 +419,6 @@ export class QuestionSetsService {
             userId: user?.sub,
           }),
       )
-
       .where('questionSet.id = :id', { id })
       .andWhere('questionSet.status = :status', {
         status: QuestionSetStatus.PUBLISHED,
@@ -481,15 +434,45 @@ export class QuestionSetsService {
       };
     }
 
+    // Get purchase information for exclusive question sets
+    let purchaseInfo: {
+      isPurchased: boolean;
+      totalPurchases: number;
+      unusedPurchases: number;
+      purchases: { id: string; purchasedAt: Date; isUsed: boolean }[];
+    };
+    if (questionSet.accessType === QuestionSetAccessType.EXCLUSIVE) {
+      const purchases = await this.questionSetPurchaseRepository.find({
+        where: {
+          userId: user.sub,
+          questionSetId: questionSet.id,
+        },
+        select: ['id', 'purchasedAt', 'isUsed'],
+      });
+
+      purchaseInfo = {
+        isPurchased: purchases.length > 0,
+        totalPurchases: purchases.length,
+        unusedPurchases: purchases.filter((p) => !p.isUsed).length,
+        purchases: purchases.map((p) => ({
+          id: p.id,
+          purchasedAt: p.purchasedAt,
+          isUsed: p.isUsed,
+        })),
+      };
+    }
+
     return {
       success: true,
       message: 'Question Set retrieved successfully',
-      data: questionSet,
+      data: {
+        ...questionSet,
+        purchaseInfo,
+      },
     };
   }
 
   async update(id: string, dto: UpdateQuestionSetDto) {
-    // 1. Check if the question set exists
     const questionSet = await this.questionSetRepository
       .createQueryBuilder('questionSet')
       .leftJoinAndSelect(
@@ -499,20 +482,26 @@ export class QuestionSetsService {
       .where('questionSet.id = :id', { id })
       .getOne();
 
-    if (!questionSet) {
+    if (questionSet === null) {
       throw new NotFoundException('Question Set does not exist');
     }
 
-    if (
-      questionSet.questionSetAttempts &&
-      questionSet.questionSetAttempts.length > 0
-    ) {
+    if (questionSet.questionSetAttempts?.length > 0) {
       throw new BadRequestException(
         'Cannot update a question set that has been attempted.',
       );
     }
 
-    // 2. Perform update
+    // Ensure creditCost is only set for exclusive sets
+    if (
+      dto.accessType !== QuestionSetAccessType.EXCLUSIVE &&
+      dto.creditCost !== undefined
+    ) {
+      throw new BadRequestException(
+        'Credit cost can only be set for exclusive question sets',
+      );
+    }
+
     const result = await this.questionSetRepository
       .createQueryBuilder()
       .update(QuestionSet)
@@ -522,7 +511,7 @@ export class QuestionSetsService {
 
     return {
       id,
-      message: 'Question set updated sucessfuly',
+      message: 'Question set updated successfully',
       data: result,
     };
   }
@@ -544,7 +533,7 @@ export class QuestionSetsService {
       .execute();
     return {
       success: true,
-      message: 'Question set published sucessfuly',
+      message: 'Question set published successfully',
       data: updatedQuestionSet,
     };
   }
@@ -552,6 +541,10 @@ export class QuestionSetsService {
   async draft(id: string) {
     const questionSet = await this.questionSetRepository
       .createQueryBuilder('questionSet')
+      .leftJoinAndSelect(
+        'questionSet.questionSetAttempts',
+        'questionSetAttempt',
+      )
       .where('questionSet.id = :id', { id })
       .getOne();
 
@@ -559,10 +552,7 @@ export class QuestionSetsService {
       throw new NotFoundException('Question Set does not exist');
     }
 
-    if (
-      questionSet.questionSetAttempts &&
-      questionSet.questionSetAttempts.length > 0
-    ) {
+    if (questionSet.questionSetAttempts?.length > 0) {
       throw new BadRequestException(
         'Cannot draft a question set that has been attempted.',
       );
@@ -576,12 +566,11 @@ export class QuestionSetsService {
       .execute();
     return {
       success: true,
-      message: 'Question set drafted sucessfuly',
+      message: 'Question set drafted successfully',
       data: updatedQuestionSet,
     };
   }
 
-  // DELETE QuestionSet by ID
   async delete(id: string) {
     const questionSet = await this.questionSetRepository
       .createQueryBuilder('questionSet')
@@ -593,10 +582,7 @@ export class QuestionSetsService {
       throw new NotFoundException('QuestionSet not found');
     }
 
-    if (
-      questionSet.questionSetAttempts &&
-      questionSet.questionSetAttempts.length > 0
-    ) {
+    if (questionSet.questionSetAttempts?.length > 0) {
       throw new BadRequestException(
         'Cannot delete a question set that has been attempted.',
       );

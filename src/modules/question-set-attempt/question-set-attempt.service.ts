@@ -12,19 +12,31 @@ import { QuestionType } from 'src/common/enums/question.enum';
 import { QuestionSetAttempt } from 'src/modules/question-set-attempt/entities/question-set-attempt.entity';
 import {
   QuestionSet,
+  QuestionSetAccessType,
   QuestionSetStatus,
 } from 'src/modules/question-sets/entities/question-set.entity';
 import { DataSource, MoreThan, QueryRunner, Repository } from 'typeorm';
 import { QuestionAttempt } from '../question-attempt/entities/question-attempt.entity';
+import { QuestionSetPurchase } from '../question-sets/entities/question-set-purchase.entity';
 import { QuestionStats } from '../question-stats/entities/question-stat.entity';
 import {
   SubscriptionPaymentStatus,
   UserSubscription,
 } from '../user-subscriptions/entities/user-subscription.entity';
 import { QuestionAttemptDto } from './dto/question-attempt.dto';
-import { ReviewAnswerDto } from './dto/review-answer.dto copy';
+import { ReviewAnswerDto } from './dto/review-answer.dto';
 
-const questionSetAttemptStatuses = ['pending', 'in_review', 'completed'];
+interface LeaderboardRow {
+  userId: string;
+  userName: string;
+  totalAttempts: string;
+}
+
+const questionSetAttemptStatuses = [
+  'pending',
+  'in_review',
+  'completed',
+] as const;
 
 @Injectable()
 export class QuestionSetAttemptService {
@@ -43,30 +55,30 @@ export class QuestionSetAttemptService {
   /*
     SERVICES FROM HERE ARE FOR STUDENTS ONLY
   */
-  async startQuestionSetAttempt(questionSetId: string) {
-    const user = this.request.user;
-
-    // INITIALIZING AND STARTING THE DB TRANSACTION
+  async startQuestionSetAttempt(questionSetId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: Partial<QuestionSetAttempt>;
+  }> {
+    const user = this.request.user as { sub: string };
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // REPOSITORY INITIALIZATION
       const questionSetRepo = queryRunner.manager.getRepository(QuestionSet);
       const questionSetAttemptRepo =
         queryRunner.manager.getRepository(QuestionSetAttempt);
       const questionAttemptRepo =
         queryRunner.manager.getRepository(QuestionAttempt);
       const questionStatRepo = queryRunner.manager.getRepository(QuestionStats);
+      const questionSetPurchaseRepo =
+        queryRunner.manager.getRepository(QuestionSetPurchase);
 
-      //
       const questionSet = await questionSetRepo
         .createQueryBuilder('questionSet')
         .leftJoinAndSelect('questionSet.questions', 'question')
-        .where('questionSet.id = :questionSetId', {
-          questionSetId: questionSetId,
-        })
+        .where('questionSet.id = :questionSetId', { questionSetId })
         .andWhere('questionSet.status = :status', {
           status: QuestionSetStatus.PUBLISHED,
         })
@@ -80,34 +92,65 @@ export class QuestionSetAttemptService {
         });
       }
 
-      const subscription = await this.userSubscriptionRepository.findOne({
-        where: {
-          userId: user.sub,
-          isActive: true,
-          paymentStatus: SubscriptionPaymentStatus.COMPLETE,
-          expiresAt: MoreThan(new Date()), // Only not expired subscriptions
-        },
-        order: { createdAt: 'DESC' }, // Get the most recent
-        relations: ['plan'],
-      });
+      // Check access based on question set type
+      switch (questionSet.accessType) {
+        case QuestionSetAccessType.FREE:
+          // No checks needed
+          break;
 
-      if (!subscription && !questionSet.isFree) {
-        throw new ForbiddenException({
-          success: false,
-          message: 'You need to subscribe to access premium question sets.',
-          data: null,
-        });
+        case QuestionSetAccessType.PAID: {
+          // Check active subscription
+          const subscription = await this.userSubscriptionRepository.findOne({
+            where: {
+              userId: user.sub,
+              isActive: true,
+              paymentStatus: SubscriptionPaymentStatus.COMPLETE,
+              expiresAt: MoreThan(new Date()),
+            },
+            order: { createdAt: 'DESC' },
+            relations: ['plan'],
+          });
+
+          if (!subscription) {
+            throw new ForbiddenException({
+              success: false,
+              message: 'You need to subscribe to access premium question sets.',
+              data: null,
+            });
+          }
+          break;
+        }
+
+        case QuestionSetAccessType.EXCLUSIVE: {
+          // Check for unused purchase
+          const purchase = await questionSetPurchaseRepo.findOne({
+            where: {
+              userId: user.sub,
+              questionSetId,
+              isUsed: false,
+            },
+            order: { purchasedAt: 'ASC' }, // Use oldest first
+          });
+
+          if (!purchase) {
+            throw new ForbiddenException({
+              success: false,
+              message: 'You need to purchase this question set using credits.',
+              data: null,
+            });
+          }
+          break;
+        }
       }
 
       const existingAttemptsCount = await questionSetAttemptRepo
         .createQueryBuilder('questionSetAttempt')
-        .where('questionSetAttempt.userId = :userId', { userId: user?.sub })
+        .where('questionSetAttempt.userId = :userId', { userId: user.sub })
         .andWhere('questionSetAttempt.questionSetId = :questionSetId', {
           questionSetId: questionSet.id,
         })
         .getCount();
 
-      // Determine the new attempt number
       const newAttemptNumber = existingAttemptsCount + 1;
 
       const now = new Date();
@@ -117,18 +160,38 @@ export class QuestionSetAttemptService {
           : null;
 
       const questionSetAttemptPayload = questionSetAttemptRepo.create({
-        userId: user?.sub,
+        userId: user.sub,
         questionSet: { id: questionSet.id },
         isCompleted: false,
         startedAt: now,
-        expiryAt: expiryAt,
+        expiryAt,
         attemptNumber: newAttemptNumber,
       });
+
       const questionSetAttempt = await questionSetAttemptRepo.save(
         questionSetAttemptPayload,
       );
 
-      // Create Question Attempts on Question Set Attempt
+      // For exclusive sets, mark purchase as used
+      if (questionSet.accessType === QuestionSetAccessType.EXCLUSIVE) {
+        const purchase = await questionSetPurchaseRepo.findOne({
+          where: {
+            userId: user.sub,
+            questionSetId,
+            isUsed: false,
+          },
+          order: { purchasedAt: 'ASC' },
+        });
+
+        if (purchase) {
+          await questionSetPurchaseRepo.update(purchase.id, {
+            isUsed: true,
+            questionSetAttemptId: questionSetAttempt.id,
+          });
+        }
+      }
+
+      // Create Question Attempts
       const questions = questionSet.questions;
       for (const question of questions) {
         const questionAttemptPayload = questionAttemptRepo.create({
@@ -145,13 +208,11 @@ export class QuestionSetAttemptService {
           .getOne();
 
         if (!questionStat) {
-          questionStat = queryRunner.manager
-            .getRepository(QuestionStats)
-            .create({
-              questionId: question.id,
-              timesUsed: 1,
-              timesAnsweredCorrectly: 0,
-            });
+          questionStat = questionStatRepo.create({
+            questionId: question.id,
+            timesUsed: 1,
+            timesAnsweredCorrectly: 0,
+          });
         } else {
           questionStat.timesUsed += 1;
         }
@@ -164,18 +225,13 @@ export class QuestionSetAttemptService {
         success: true,
         message: 'Quiz started, Best of luck student.',
         data: {
-          // remainingTimeSeconds: remainingTimeSeconds,
-          // serverTime: new Date().toISOString(),
-          // expiryAt: expiryAt,
-          // startedAt: now,
-          // questionSetAttempt:
           ...questionSetAttempt,
         },
       };
-    } catch (error) {
+    } catch (error: unknown) {
       await queryRunner.rollbackTransaction();
       const errorMessage =
-        error instanceof Error ? error.message : 'Failed to submit answer.';
+        error instanceof Error ? error.message : 'Failed to start quiz.';
       throw new BadRequestException({
         success: false,
         message: errorMessage,
@@ -192,8 +248,16 @@ export class QuestionSetAttemptService {
     limit: number,
     search?: string,
     status?: string,
-  ) {
-    const user = this.request.user;
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: QuestionSetAttempt[];
+    totalItems: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  }> {
+    const user = this.request.user as { sub: string };
 
     const skip = (page - 1) * limit;
 
@@ -201,16 +265,23 @@ export class QuestionSetAttemptService {
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.category', 'category')
-      .where('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      .where('questionSetAttempt.userId = :userId', { userId: user.sub })
       .orderBy('questionSetAttempt.completedAt', 'DESC')
       .skip(skip)
       .take(limit);
 
     if (search) {
-      query.andWhere('questionSet.name ILIKE :search', { search });
+      query.andWhere('questionSet.name ILIKE :search', {
+        search: `%${search}%`,
+      });
     }
 
-    if (questionSetAttemptStatuses.includes(status)) {
+    if (
+      status &&
+      questionSetAttemptStatuses.includes(
+        status as (typeof questionSetAttemptStatuses)[number],
+      )
+    ) {
       if (status === 'pending') {
         query.andWhere('questionSetAttempt.isCompleted = :isCompleted', {
           isCompleted: false,
@@ -242,7 +313,7 @@ export class QuestionSetAttemptService {
 
     return {
       success: true,
-      message: 'Question set attempts retrieved successful.',
+      message: 'Question set attempts retrieved successfully.',
       data,
       totalItems,
       totalPages: Math.ceil(totalItems / limit),
@@ -252,8 +323,12 @@ export class QuestionSetAttemptService {
   }
 
   // Question Set Attempt for student
-  async getQuestionSetAttemptById(questionSetAttemptId: string) {
-    const user = this.request.user;
+  async getQuestionSetAttemptById(questionSetAttemptId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: QuestionSetAttempt;
+  }> {
+    const user = this.request.user as { sub: string };
     const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
@@ -284,7 +359,7 @@ export class QuestionSetAttemptService {
       ])
       .addSelect(['option.id', 'option.optionText'])
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
-      .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      .andWhere('questionSetAttempt.userId = :userId', { userId: user.sub })
       .orderBy('questionAttempt.id', 'ASC')
       .getOne();
 
@@ -303,8 +378,12 @@ export class QuestionSetAttemptService {
   }
 
   // Report of the completed question set attempt
-  async getQuestionSetAttemptReportById(questionSetAttemptId: string) {
-    const user = this.request.user;
+  async getQuestionSetAttemptReportById(questionSetAttemptId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: any; // Consider defining a proper interface for the return type
+  }> {
+    const user = this.request.user as { sub: string };
     const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
@@ -318,7 +397,7 @@ export class QuestionSetAttemptService {
       .leftJoinAndSelect('question.subject', 'subject')
       .leftJoinAndSelect('question.subSubject', 'subSubject')
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
-      .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      .andWhere('questionSetAttempt.userId = :userId', { userId: user.sub })
       .orderBy('questionAttempt.createdAt', 'ASC')
       .getOne();
 
@@ -339,7 +418,7 @@ export class QuestionSetAttemptService {
     }
 
     if (!questionSetAttempt.questionSet || !questionSetAttempt.questionSet.id) {
-      throw new Error('QuestionSet ID not found for the attempt.'); // Or a more specific error
+      throw new Error('QuestionSet ID not found for the attempt.');
     }
 
     const totalPossibleScore = questionSetAttempt.questionAttempts.length;
@@ -361,7 +440,7 @@ export class QuestionSetAttemptService {
     // 2. Fetch all completed attempts for this specific questionSetId
     const allCompletedAttemptsForSet = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
-      .select(['questionSetAttempt.score', 'questionSetAttempt.userId']) // Only select score and userId
+      .select(['questionSetAttempt.score', 'questionSetAttempt.userId'])
       .where('questionSetAttempt.questionSetId = :questionSetId', {
         questionSetId: questionSetAttempt.questionSet.id,
       })
@@ -371,9 +450,8 @@ export class QuestionSetAttemptService {
       .getMany();
 
     // 3. Process the fetched attempts to get aggregate statistics
-
     let highestOverallScore = 0;
-    let lowestOverallScore = Infinity; // Initialize with a very large number
+    let lowestOverallScore = Infinity;
     let totalOverallScore = 0;
     let overallAttemptCount = 0;
 
@@ -383,7 +461,7 @@ export class QuestionSetAttemptService {
     let userAttemptCount = 0;
 
     for (const attempt of allCompletedAttemptsForSet) {
-      const score = attempt.score; // Assuming 'score' field exists
+      const score = attempt.score;
 
       if (score > highestOverallScore) {
         highestOverallScore = score;
@@ -394,7 +472,7 @@ export class QuestionSetAttemptService {
       totalOverallScore += score;
       overallAttemptCount++;
 
-      if (attempt.userId === user?.sub) {
+      if (attempt.userId === user.sub) {
         if (score > userHighestScore) {
           userHighestScore = score;
         }
@@ -430,15 +508,15 @@ export class QuestionSetAttemptService {
       success: true,
       message: 'Question set report generated successfully.',
       data: {
-        ...questionSetAttempt, // Include all existing details of the current attempt
+        ...questionSetAttempt,
         reportStatistics: {
-          currentAttemptScore: currentAttemptScore,
+          currentAttemptScore,
           currentAttemptPercentage: parseFloat(
             currentAttemptPercentage.toFixed(2),
-          ), // Format to 2 decimal places
+          ),
 
           // Overall statistics (scores)
-          highestOverallScore: highestOverallScore,
+          highestOverallScore,
           lowestOverallScore: overallAttemptCount > 0 ? lowestOverallScore : 0,
           averageOverAllScore: parseFloat(averageOverAllScore.toFixed(2)),
 
@@ -454,7 +532,7 @@ export class QuestionSetAttemptService {
           ),
 
           // User-specific statistics (scores)
-          userHighestScore: userHighestScore,
+          userHighestScore,
           userLowestScore: userAttemptCount > 0 ? userLowestScore : 0,
           userAverageScore: parseFloat(userAverageScore.toFixed(2)),
 
@@ -469,16 +547,28 @@ export class QuestionSetAttemptService {
     };
   }
 
-  // Status of an question set attempt, remaining time and completed status
-  async getQuestionSetAttemptStatusById(questionSetAttemptId: string) {
-    const user = this.request.user;
+  // Status of a question set attempt, remaining time and completed status
+  async getQuestionSetAttemptStatusById(questionSetAttemptId: string): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      startedAt: Date;
+      expiryAt: Date | null;
+      timeLimitSeconds: number | null;
+      serverTime: string;
+      remainingTimeSeconds: number | null;
+      isCompleted: boolean;
+      isExpired: boolean;
+    };
+  }> {
+    const user = this.request.user as { sub: string };
     const now = new Date();
 
     const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
-      .andWhere('questionSetAttempt.userId = :userId', { userId: user?.sub })
+      .andWhere('questionSetAttempt.userId = :userId', { userId: user.sub })
       .getOne();
 
     if (!questionSetAttempt) {
@@ -523,8 +613,17 @@ export class QuestionSetAttemptService {
   async answerQuestion(
     questionSetAttemptId: string,
     payload: QuestionAttemptDto,
-  ) {
-    const user = this.request.user;
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      expiryAt: Date | null;
+      startedAt: Date;
+      remainingTimeSeconds: number | null;
+      serverTime: string;
+    };
+  }> {
+    const user = this.request.user as { sub: string };
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -576,7 +675,7 @@ export class QuestionSetAttemptService {
           questionAttemptId: payload.questionAttemptId,
         })
         .andWhere('questionSetAttempt.id = :questionSetAttemptId', {
-          questionSetAttemptId: questionSetAttemptId,
+          questionSetAttemptId,
         })
         .getOne();
 
@@ -592,7 +691,7 @@ export class QuestionSetAttemptService {
       }
 
       let isCorrect: boolean | null = false;
-      let isChecked: boolean | null = true;
+      let isChecked = true;
       if (question.type === QuestionType.MCQ && payload.selectedOptionId) {
         const selectedOption =
           question.options &&
@@ -609,7 +708,6 @@ export class QuestionSetAttemptService {
       } else if (question.type === QuestionType.TRUE_OR_FALSE) {
         isCorrect =
           question.correctAnswerBoolean === payload.selectedBooleanAnswer;
-        console.log('IS CORRECT : ', isCorrect);
       } else if (question.type === QuestionType.FILL_IN_THE_BLANKS) {
         isCorrect = !!(
           payload.selectedTextAnswer &&
@@ -643,6 +741,10 @@ export class QuestionSetAttemptService {
           .leftJoinAndSelect('questionStats.question', 'question')
           .where('question.id = :questionId', { questionId: question.id })
           .getOne();
+
+        if (!questionStats) {
+          throw new NotFoundException('Question stats not found');
+        }
 
         if (isCorrect) {
           questionStats.timesAnsweredCorrectly = questionAttempt?.isCorrect
@@ -707,8 +809,16 @@ export class QuestionSetAttemptService {
   }
 
   // Service to mark the question set attempt as completed
-  async finishQuiz(questionSetAttemptId: string) {
-    const user = this.request.user;
+  async finishQuiz(questionSetAttemptId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      score: number;
+      total: number;
+      percentage: number;
+    };
+  }> {
+    const user = this.request.user as { sub: string };
     const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
@@ -751,7 +861,7 @@ export class QuestionSetAttemptService {
     questionSetAttempt.score = correctCount;
     questionSetAttempt.percentage =
       total > 0 ? (correctCount / total) * 100 : 0;
-    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : true;
+    questionSetAttempt.isChecked = !hasManuallyCheckableQuestions;
 
     await this.questionSetAttemptRepository.save(questionSetAttempt);
 
@@ -767,7 +877,10 @@ export class QuestionSetAttemptService {
   }
 
   // Service to complete the quiz automatically if time ends ( Called in getQuestionSetAttemptStatusById service)
-  async completeQuiz(questionSetAttemptId: string, queryRunner?: QueryRunner) {
+  async completeQuiz(
+    questionSetAttemptId: string,
+    queryRunner?: QueryRunner,
+  ): Promise<void> {
     const manager = queryRunner?.manager || this.dataSource.manager;
 
     const questionSetAttempt = await manager
@@ -776,7 +889,7 @@ export class QuestionSetAttemptService {
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
       .where('questionSetAttempt.id = :questionSetAttemptId', {
-        questionSetAttemptId: questionSetAttemptId,
+        questionSetAttemptId,
       })
       .getOne();
 
@@ -786,7 +899,7 @@ export class QuestionSetAttemptService {
       .getRepository(QuestionAttempt)
       .createQueryBuilder('questionAttempt')
       .where('questionAttempt.questionSetAttemptId = :questionSetAttemptId', {
-        questionSetAttemptId: questionSetAttemptId,
+        questionSetAttemptId,
       })
       .getMany();
 
@@ -803,7 +916,7 @@ export class QuestionSetAttemptService {
     questionSetAttempt.score = correctCount;
     questionSetAttempt.percentage =
       total > 0 ? (correctCount / total) * 100 : 0;
-    questionSetAttempt.isChecked = hasManuallyCheckableQuestions ? false : null;
+    questionSetAttempt.isChecked = !hasManuallyCheckableQuestions;
 
     await manager.getRepository(QuestionSetAttempt).save(questionSetAttempt);
   }
@@ -813,7 +926,11 @@ export class QuestionSetAttemptService {
     SERVICES FROM HERE ARE FOR ADMINS ONLY
   */
   // List of all the completed but unchecked question set attempts
-  async getQuestionSetAttemptsToReview() {
+  async getQuestionSetAttemptsToReview(): Promise<{
+    success: boolean;
+    message: string;
+    data: QuestionSetAttempt[];
+  }> {
     const questionSetAttempts = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
@@ -835,7 +952,13 @@ export class QuestionSetAttemptService {
   }
 
   // Question set attempt to review (To check/ review answers in the question sets that are long or short typed)
-  async getQuestionSetAttemptToReviewById(questionSetAttemptId: string) {
+  async getQuestionSetAttemptToReviewById(
+    questionSetAttemptId: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: QuestionSetAttempt;
+  }> {
     const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
@@ -849,9 +972,6 @@ export class QuestionSetAttemptService {
       .leftJoinAndSelect('question.subject', 'subject')
       .leftJoinAndSelect('question.subSubject', 'subSubject')
       .where('questionSetAttempt.id = :id', { id: questionSetAttemptId })
-      // .andWhere('questionSetAttempt.isCompleted = :isCompleted', {
-      //   isCompleted: true,
-      // })
       .orderBy('questionAttempt.id', 'ASC')
       .getOne();
 
@@ -870,85 +990,6 @@ export class QuestionSetAttemptService {
       });
     }
 
-    // const questionAttempts = questionSetAttempt.questionAttempts.map(
-    //   (attempt) => {
-    //     const { question } = attempt;
-
-    //     const selectedAnswer =
-    //       attempt.selectedOptionId ??
-    //       attempt.selectedBooleanAnswer ??
-    //       attempt.selectedTextAnswer ??
-    //       null;
-
-    //     // We use stored `isCorrect` and pull correct answer from question
-    //     let correctAnswer: string | boolean | null = null;
-
-    //     switch (question.type) {
-    //       case QuestionType.MCQ:
-    //         correctAnswer =
-    //           question.options?.find((opt) => opt.isCorrect)?.id ?? null;
-    //         break;
-    //       case QuestionType.TRUE_OR_FALSE:
-    //         correctAnswer =
-    //           typeof question.correctAnswerBoolean == 'boolean'
-    //             ? question.correctAnswerBoolean
-    //             : null;
-    //         break;
-    //       case QuestionType.FILL_IN_THE_BLANKS:
-    //         correctAnswer =
-    //           typeof question.correctAnswerText == 'string'
-    //             ? question.correctAnswerText
-    //             : null;
-    //         break;
-    //     }
-
-    //     return {
-    //       id: attempt.id,
-    //       selectedAnswer,
-    //       isCorrect: attempt.isCorrect,
-    //       question: {
-    //         id: question.id,
-    //         question: question.questionText,
-    //         type: question.type,
-    //         difficulty: question.difficulty,
-    //         subject: {
-    //           id: question.subject?.id,
-    //           name: question.subject?.name,
-    //         },
-    //         subSubject: {
-    //           id: question.subSubject?.id,
-    //           name: question.subSubject?.name,
-    //         },
-    //         options: question.options?.map((opt) => ({
-    //           id: opt.id,
-    //           option: opt.option_text,
-    //           isCorrect: opt.isCorrect,
-    //         })),
-    //         correctAnswer,
-    //       },
-    //     };
-    //   },
-    // );
-
-    // const attemptedQuestionsCount = questionAttempts.filter(
-    //   (a) => a.selectedAnswer !== null,
-    // ).length;
-
-    // const report = {
-    //   id: questionSetAttempt.id,
-    //   questionSetId: questionSetAttempt.questionSet.id,
-    //   startedAt: questionSetAttempt.startedAt,
-    //   completedAt: questionSetAttempt.completedAt,
-    //   isCompleted: questionSetAttempt.isCompleted,
-    //   score: questionSetAttempt.score,
-    //   percentage: questionSetAttempt.percentage,
-    //   questionSetName: questionSetAttempt.questionSet.name,
-    //   questionSetCategory: questionSetAttempt.questionSet.category,
-    //   questionSetTimer: questionSetAttempt.questionSet.timeLimitSeconds,
-    //   attemptedQuestionsCount,
-    //   questionAttempts,
-    // };
-
     return {
       success: true,
       message: 'Question set report generated successfully.',
@@ -957,7 +998,17 @@ export class QuestionSetAttemptService {
   }
 
   // Review answer of unchecked questionAttempt and mark it correct or incorrect
-  async reviewAnswer(questionAttemptId: string, payload: ReviewAnswerDto) {
+  async reviewAnswer(
+    questionAttemptId: string,
+    payload: ReviewAnswerDto,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      questionAttemptId: string;
+      isCorrect: boolean;
+    };
+  }> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -978,7 +1029,7 @@ export class QuestionSetAttemptService {
         .leftJoinAndSelect('questionAttempt.question', 'question')
         .leftJoinAndSelect('question.questionStats', 'questionStats')
         .where('questionAttempt.id = :questionAttemptId', {
-          questionAttemptId: questionAttemptId,
+          questionAttemptId,
         })
         .getOne();
 
@@ -1011,6 +1062,10 @@ export class QuestionSetAttemptService {
         .where('question.id = :questionId', { questionId: question.id })
         .getOne();
 
+      if (!questionStats) {
+        throw new NotFoundException('Question stats not found');
+      }
+
       // If review changed from incorrect to correct
       if (!previousIsCorrect && payload.isCorrect) {
         questionStats.timesAnsweredCorrectly += 1;
@@ -1041,7 +1096,11 @@ export class QuestionSetAttemptService {
         })
         .getOne();
 
-      const allQuestionAttempts = questionSetAttempt?.questionAttempts;
+      if (!questionSetAttempt) {
+        throw new NotFoundException('Question set attempt not found');
+      }
+
+      const allQuestionAttempts = questionSetAttempt.questionAttempts;
 
       const score = allQuestionAttempts.filter((a) => a.isCorrect).length;
       const total = questionSetAttempt.questionSet.questions.length;
@@ -1059,8 +1118,7 @@ export class QuestionSetAttemptService {
           isCorrect: payload.isCorrect,
         },
       };
-    } catch (error) {
-      console.log(error);
+    } catch (error: unknown) {
       await queryRunner.rollbackTransaction();
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to Review the answer.';
@@ -1075,13 +1133,19 @@ export class QuestionSetAttemptService {
   }
 
   // Mark isChecked , marking if the checking of the question set attempt is completed
-  async markIsChecked(questionSetAttemptId: string) {
+  async markIsChecked(questionSetAttemptId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      questionSetAttemptId: string;
+    };
+  }> {
     const questionSetAttempt = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .leftJoinAndSelect('questionSetAttempt.questionSet', 'questionSet')
       .leftJoinAndSelect('questionSet.questions', 'question')
       .where('questionSetAttempt.id = :questionSetAttemptId', {
-        questionSetAttemptId: questionSetAttemptId,
+        questionSetAttemptId,
       })
       .getOne();
 
@@ -1118,12 +1182,15 @@ export class QuestionSetAttemptService {
     };
   }
 
-  async getQuestionSetAttemptLeaderboard() {
-    interface LeaderboardRow {
+  async getQuestionSetAttemptLeaderboard(): Promise<{
+    success: boolean;
+    message: string;
+    data: Array<{
       userId: string;
-      userName: string;
-      totalAttempts: string; // because COUNT(*) comes back as a string from SQL
-    }
+      name: string;
+      totalAttempts: number;
+    }>;
+  }> {
     const result = await this.questionSetAttemptRepository
       .createQueryBuilder('questionSetAttempt')
       .innerJoin('questionSetAttempt.user', 'user')
@@ -1132,12 +1199,13 @@ export class QuestionSetAttemptService {
         'user.name AS userName',
         'COUNT(*) AS totalAttempts',
       ])
-      .where('questionSetAttempt.isCompleted = :completed', { completed: true }) // optional filter
+      .where('questionSetAttempt.isCompleted = :completed', { completed: true })
       .groupBy('user.id')
       .addGroupBy('user.name')
       .orderBy('totalAttempts', 'DESC')
       .limit(10)
       .getRawMany<LeaderboardRow>();
+
     return {
       success: true,
       message: 'Question set attempt marked as checked.',

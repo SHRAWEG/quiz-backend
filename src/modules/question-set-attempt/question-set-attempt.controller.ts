@@ -14,7 +14,7 @@ import { Role } from 'src/common/enums/roles.enum';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/role.gaurd';
 import { QuestionAttemptDto } from './dto/question-attempt.dto';
-import { ReviewAnswerDto } from './dto/review-answer.dto copy';
+import { ReviewAnswerDto } from './dto/review-answer.dto';
 import { QuestionSetAttemptService } from './question-set-attempt.service';
 
 @Controller('question-set-attempts')
