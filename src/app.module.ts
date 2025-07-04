@@ -21,6 +21,7 @@ import { CategoriesModule } from './modules/categories/category.module';
 import { Category } from './modules/categories/entities/category.entity';
 import { CronTaskModule } from './modules/cron-task/cron-task.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { FeedbacksModule } from './modules/feedbacks/feedbacks.module';
 import { OptionsModule } from './modules/options/options.module';
 import { QuestionAttemptModule } from './modules/question-attempt/question-attempt.module';
 import { QuestionSetAttemptModule } from './modules/question-set-attempt/question-set-attempt.module';
@@ -77,6 +78,7 @@ import { UsersModule } from './modules/users/users.module';
     UserSubscriptionsModule,
     CronTaskModule,
     DashboardModule,
+    FeedbacksModule,
   ],
   controllers: [],
   providers: [UsersService, EmailService],
