@@ -1,12 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsPositive,
   IsString,
   IsUUID,
   ValidateIf,
 } from 'class-validator';
+import { QuestionSetAccessType } from '../entities/question-set.entity';
 
 export class CreateQuestionSetDto {
   @ApiProperty({
@@ -21,9 +23,24 @@ export class CreateQuestionSetDto {
   @IsUUID()
   categoryId: string;
 
-  @ApiProperty()
-  @IsBoolean()
-  isFree: boolean;
+  @ApiProperty({
+    enum: QuestionSetAccessType,
+    default: QuestionSetAccessType.FREE,
+  })
+  @IsEnum(QuestionSetAccessType)
+  accessType: QuestionSetAccessType;
+
+  @ApiProperty({
+    example: 30,
+    required: false,
+  })
+  @ValidateIf(
+    (o: CreateQuestionSetDto) =>
+      o.accessType === QuestionSetAccessType.EXCLUSIVE,
+  )
+  @IsInt()
+  @IsPositive()
+  creditCost?: number;
 
   @ApiProperty()
   @IsBoolean()

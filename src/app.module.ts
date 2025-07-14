@@ -19,6 +19,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CategoriesModule } from './modules/categories/category.module';
 import { Category } from './modules/categories/entities/category.entity';
+import { CreditModule } from './modules/credit/credit.module';
 import { CronTaskModule } from './modules/cron-task/cron-task.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { FeedbacksModule } from './modules/feedbacks/feedbacks.module';
@@ -77,6 +78,7 @@ import { UsersModule } from './modules/users/users.module';
     SubscriptionPlansModule,
     UserSubscriptionsModule,
     CronTaskModule,
+    CreditModule,
     DashboardModule,
     FeedbacksModule,
   ],

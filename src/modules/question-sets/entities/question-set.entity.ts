@@ -19,13 +19,24 @@ export enum QuestionSetStatus {
   PUBLISHED = 'published',
 }
 
+export enum QuestionSetAccessType {
+  FREE = 'free',
+  PAID = 'paid',
+  EXCLUSIVE = 'exclusive',
+}
+
 @Entity()
 export class QuestionSet {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ default: false })
-  isFree: boolean;
+  @Column({
+    default: QuestionSetAccessType.FREE,
+  })
+  accessType: QuestionSetAccessType;
+
+  @Column({ type: 'integer', nullable: true })
+  creditCost: number | null; // Required for EXCLUSIVE sets
 
   @Column({ type: 'text' })
   categoryId: string;
