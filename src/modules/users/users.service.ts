@@ -302,11 +302,7 @@ export class UsersService {
     };
   }
 
-  async getStudents(
-    page: number,
-    limit: number,
-    search?: string,
-  ): Promise<ApiResponse<User[]>> {
+  async getStudents(page: number, limit: number, search?: string) {
     const skip = (page - 1) * limit;
 
     const query = this.userRepo
@@ -322,19 +318,20 @@ export class UsersService {
         { search: `%${search}%` },
       );
     }
-    const students = await query.getMany();
+    const [students, totalItems] = await query.getManyAndCount();
+    const totalPages = Math.ceil(totalItems / limit);
     return {
-      message: 'User created successfully.',
+      message: 'Students fetched successfully.',
       success: true,
       data: students,
+      totalItems,
+      totalPages,
+      currentPage: page,
+      pageSize: limit,
     };
   }
 
-  async getTeachers(
-    page: number,
-    limit: number,
-    search?: string,
-  ): Promise<ApiResponse<User[]>> {
+  async getTeachers(page: number, limit: number, search?: string) {
     const skip = (page - 1) * limit;
 
     const query = this.userRepo
@@ -350,11 +347,16 @@ export class UsersService {
         { search: `%${search}%` },
       );
     }
-    const students = await query.getMany();
+    const [students, totalItems] = await query.getManyAndCount();
+    const totalPages = Math.ceil(totalItems / limit);
     return {
-      message: 'User created successfully.',
+      message: 'Students fetched successfully.',
       success: true,
       data: students,
+      totalItems,
+      totalPages,
+      currentPage: page,
+      pageSize: limit,
     };
   }
 
