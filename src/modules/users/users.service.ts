@@ -302,6 +302,62 @@ export class UsersService {
     };
   }
 
+  async getStudents(
+    page: number,
+    limit: number,
+    search?: string,
+  ): Promise<ApiResponse<User[]>> {
+    const skip = (page - 1) * limit;
+
+    const query = this.userRepo
+      .createQueryBuilder('user')
+      .where('user.role = :role', { role: Role.STUDENT })
+      .orderBy('user.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    if (search) {
+      query.andWhere(
+        `(user.firstName ILIKE :search OR user.middleName ILIKE :search OR user.lastName ILIKE :search)`,
+        { search: `%${search}%` },
+      );
+    }
+    const students = await query.getMany();
+    return {
+      message: 'User created successfully.',
+      success: true,
+      data: students,
+    };
+  }
+
+  async getTeachers(
+    page: number,
+    limit: number,
+    search?: string,
+  ): Promise<ApiResponse<User[]>> {
+    const skip = (page - 1) * limit;
+
+    const query = this.userRepo
+      .createQueryBuilder('user')
+      .where('user.role = :role', { role: Role.TEACHER })
+      .orderBy('user.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    if (search) {
+      query.andWhere(
+        `(user.firstName ILIKE :search OR user.middleName ILIKE :search OR user.lastName ILIKE :search)`,
+        { search: `%${search}%` },
+      );
+    }
+    const students = await query.getMany();
+    return {
+      message: 'User created successfully.',
+      success: true,
+      data: students,
+    };
+  }
+
   async seedAdmin(): Promise<void> {
     const existingAdmin = await this.userRepo.findOneBy({
       email: 'admin@quizit.com',
