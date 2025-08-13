@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { Role } from 'src/common/enums/roles.enum';
 import { Repository } from 'typeorm';
+import { QuestionAttempt } from '../question-attempt/entities/question-attempt.entity';
 import { QuestionSetAttempt } from '../question-set-attempt/entities/question-set-attempt.entity';
 import { Question } from '../questions/entities/question.entity';
 import { User } from '../users/entities/user.entity';
@@ -168,5 +169,175 @@ export class DashboardService {
         totalApprovedQuestions: approvedQuestions,
       },
     };
+  }
+
+  async getLeaderboard() {
+    const currentUserId = this.request.user?.sub;
+    if (!currentUserId) {
+      return { success: true, data: [] };
+    }
+
+    try {
+      // 1. Get top 10 users ordered by score (desc) then attempts (asc)
+      type LeaderboardRow = {
+        id: string;
+        name: string;
+        score: string;
+        attempts: string;
+      };
+
+      const top10: LeaderboardRow[] = await this.userRepo
+        .createQueryBuilder('user')
+        .leftJoin(
+          QuestionSetAttempt,
+          'qsa',
+          'qsa.userId = user.id AND qsa.isCompleted = true',
+        )
+        .leftJoin(QuestionAttempt, 'qa', 'qa.questionSetAttemptId = qsa.id')
+        .select([
+          'user.id AS id',
+          `CONCAT(user.firstName, ' ', user.lastName) AS name`,
+          `ROUND(
+          (SUM(CASE WHEN qa.isCorrect = TRUE THEN 1 ELSE 0 END)::decimal / 
+          NULLIF(COUNT(qa.id), 0)) * 100, 
+          2
+        ) AS score`,
+          'COUNT(DISTINCT qsa.id) AS attempts',
+        ])
+        .where('user.role = :role', { role: Role.STUDENT })
+        .groupBy('user.id')
+        .addGroupBy('user.firstName')
+        .addGroupBy('user.lastName')
+        .orderBy('score', 'DESC')
+        .addOrderBy('attempts', 'ASC')
+        .limit(10)
+        .getRawMany();
+
+      // 2. Get current user's stats
+      type UserStats =
+        | {
+            score: string;
+            attempts: string;
+          }
+        | undefined;
+
+      const currentUserStats: UserStats = await this.userRepo
+        .createQueryBuilder('user')
+        .leftJoin(
+          QuestionSetAttempt,
+          'qsa',
+          'qsa.userId = user.id AND qsa.isCompleted = true',
+        )
+        .leftJoin(QuestionAttempt, 'qa', 'qa.questionSetAttemptId = qsa.id')
+        .select([
+          `ROUND(
+          (SUM(CASE WHEN qa.isCorrect = TRUE THEN 1 ELSE 0 END)::decimal / 
+          NULLIF(COUNT(qa.id), 0)) * 100, 
+          2
+        ) AS score`,
+          'COUNT(DISTINCT qsa.id) AS attempts',
+        ])
+        .where('user.id = :id', { id: currentUserId })
+        .groupBy('user.id')
+        .getRawOne();
+
+      // 3. Format top 10 with ranks
+      const formattedTop10 = top10.map((user, index) => ({
+        id: user.id,
+        rank: index + 1,
+        name: user.name,
+        score: Number(user.score) || 0,
+        attempts: Number(user.attempts) || 0,
+        isCurrentUser: user.id === currentUserId,
+      }));
+
+      // 4. Calculate current user's rank if not in top 10
+      let currentUserData: {
+        id: string;
+        rank: number;
+        name: string;
+        score: number;
+        attempts: number;
+        isCurrentUser: boolean;
+      } | null = null;
+
+      if (currentUserStats) {
+        const parsedScore = Number(currentUserStats.score) || 0;
+        const parsedAttempts = Number(currentUserStats.attempts) || 0;
+
+        // Count users with better scores or same score but fewer attempts
+        const betterUsersCount = await this.userRepo
+          .createQueryBuilder('user')
+          .leftJoin(
+            QuestionSetAttempt,
+            'qsa',
+            'qsa.userId = user.id AND qsa.isCompleted = true',
+          )
+          .leftJoin(QuestionAttempt, 'qa', 'qa.questionSetAttemptId = qsa.id')
+          .select('user.id', 'id')
+          .addSelect(
+            `ROUND(
+            (SUM(CASE WHEN qa.isCorrect = TRUE THEN 1 ELSE 0 END)::decimal / 
+            NULLIF(COUNT(qa.id), 0)) * 100, 
+            2
+          )`,
+            'score',
+          )
+          .addSelect('COUNT(DISTINCT qsa.id)', 'attempts')
+          .where('user.role = :role', { role: Role.STUDENT })
+          .andWhere('user.id != :currentUserId', { currentUserId })
+          .groupBy('user.id')
+          .addGroupBy('user.firstName')
+          .addGroupBy('user.lastName')
+          .having(
+            `(ROUND(
+            (SUM(CASE WHEN qa.isCorrect = TRUE THEN 1 ELSE 0 END)::decimal / 
+            NULLIF(COUNT(qa.id), 0)) * 100, 
+            2
+          ) > :score)
+          OR (
+            ROUND(
+              (SUM(CASE WHEN qa.isCorrect = TRUE THEN 1 ELSE 0 END)::decimal / 
+              NULLIF(COUNT(qa.id), 0)) * 100, 
+              2
+            ) = :score
+            AND COUNT(DISTINCT qsa.id) < :attempts
+          )`,
+            {
+              score: parsedScore,
+              attempts: parsedAttempts,
+            },
+          )
+          .getCount();
+
+        currentUserData = {
+          id: currentUserId,
+          rank: betterUsersCount + 1,
+          name: await this.getUserName(currentUserId),
+          score: parsedScore,
+          attempts: parsedAttempts,
+          isCurrentUser: true,
+        };
+      }
+
+      return {
+        success: true,
+        data:
+          currentUserData && !formattedTop10.some((u) => u.id === currentUserId)
+            ? [...formattedTop10, currentUserData]
+            : formattedTop10,
+      };
+    } catch {
+      return { success: false, message: 'Error fetching leaderboard' };
+    }
+  }
+
+  // Helper function to get user name
+  private async getUserName(userId: string): Promise<string> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      select: ['firstName', 'lastName'],
+    });
+    return user ? `${user.firstName} ${user.lastName}` : 'Current User';
   }
 }

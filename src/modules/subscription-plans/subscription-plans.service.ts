@@ -148,6 +148,8 @@ export class SubscriptionPlansService {
       .where('id = :id', { id })
       .execute();
 
+    await this.markInacive(id);
+
     const updatedSubscriptionPlan = await this.subscriptionPlanRepository
       .createQueryBuilder('subscriptionPlan')
       .where('subscriptionPlan.id = :id', { id })
@@ -157,6 +159,25 @@ export class SubscriptionPlansService {
       success: true,
       message: 'Subscription Plan updated successfully',
       data: updatedSubscriptionPlan,
+    };
+  }
+
+  async markActive(id: string) {
+    const result = await this.subscriptionPlanRepository
+      .createQueryBuilder()
+      .update(SubscriptionPlan)
+      .set({ isActive: true })
+      .where('id = :id', { id })
+      .execute();
+    if (result.affected === 0) {
+      throw new NotFoundException(
+        'Subscription plan not found: Id does not exist',
+      );
+    }
+    return {
+      success: true,
+      message: 'Subscription plan marked as active successfully',
+      data: { affected: result.affected },
     };
   }
 

@@ -29,4 +29,9 @@ export class DashboardController {
   async getTeacherDashboard() {
     return await this.dashboardService.getTeacherDashboard();
   }
+
+  @Get('/leaderboard')
+  async getLeaderboard() {
+    return await this.dashboardService.getLeaderboard();
+  }
 }

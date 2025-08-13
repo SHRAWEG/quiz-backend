@@ -1,11 +1,6 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
 import { CreateSubscriptionPlanDto } from './create-subscription-plan.dto';
 
 export class UpdateSubscriptionPlanDto extends PartialType(
   CreateSubscriptionPlanDto,
-) {
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-}
+) {}

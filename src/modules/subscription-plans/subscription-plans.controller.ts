@@ -103,6 +103,12 @@ export class SubscriptionPlansController {
 
   @Patch('mark-active/:id')
   @ApiBearerAuth()
+  markActive(@Param('id') id: string) {
+    return this.subscriptionPlansService.markActive(id);
+  }
+
+  @Patch('mark-inactive/:id')
+  @ApiBearerAuth()
   markInacive(@Param('id') id: string) {
     return this.subscriptionPlansService.markInacive(id);
   }
