@@ -26,7 +26,7 @@ export class SubscriptionPlan {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number; // NPR
 
-  @Column({ default: true })
+  @Column({ default: false })
   isActive: boolean;
 
   @CreateDateColumn()
