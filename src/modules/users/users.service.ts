@@ -8,6 +8,7 @@ import {
 import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
+import * as crypto from 'crypto';
 import { Request } from 'express';
 import { ApiResponse } from 'src/common/classes/api-response';
 import { Role } from 'src/common/enums/roles.enum';
@@ -21,6 +22,7 @@ import { EmailService } from '../email/email.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SetUserPreferencesDto } from './dto/save-user-preference.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { User } from './entities/user.entity';
 import { VerificationToken } from './entities/verification-token.entity';
 
@@ -32,6 +34,8 @@ export class UsersService {
     private readonly categoryRepo: Repository<Category>,
     @InjectRepository(VerificationToken)
     private readonly verificationTokenRepo: Repository<VerificationToken>,
+    @InjectRepository(PasswordResetToken)
+    private readonly passwordResetTokenRepo: Repository<PasswordResetToken>,
     private readonly emailService: EmailService,
     @Inject(REQUEST) private readonly request: Request,
     private readonly dataSource: DataSource,
@@ -543,6 +547,126 @@ export class UsersService {
     return new ApiResponse({
       message: 'User profile fetched successfully',
       data: user,
+    });
+  }
+
+  /**
+   * Initiates the forgot password process by generating a reset token and sending an email.
+   *
+   * @param {string} email - The email address of the user who forgot their password.
+   * @returns {Promise<ApiResponse>} - The response indicating the email was sent.
+   * @throws {NotFoundException} - If no user is found with the provided email.
+   */
+  async forgotPassword(email: string): Promise<ApiResponse<object>> {
+    const user = await this.findUserByEmail(email);
+
+    if (!user) {
+      // For security reasons, we don't reveal if the email exists or not
+      return new ApiResponse({
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+        data: {},
+      });
+    }
+
+    // Check if user's email is verified
+    if (!user.isEmailVerified) {
+      throw new BadRequestException(
+        'Please verify your email address first before resetting password.',
+      );
+    }
+
+    // Check for existing password reset token and expire it
+    const existingToken = await this.passwordResetTokenRepo.findOneBy({
+      userId: user.id,
+    });
+
+    if (existingToken) {
+      // If a token exists, expire it to prevent reuse
+      existingToken.expiresAt = new Date(); // Set to past date to expire it
+      existingToken.expiresAt.setHours(existingToken.expiresAt.getHours() - 1); // Expire the token
+      await this.passwordResetTokenRepo.save(existingToken);
+    }
+
+    // Create a password reset token
+    const token = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1); // Token expires in 1 hour for security
+
+    // Save the token
+    await this.passwordResetTokenRepo.save({
+      token,
+      userId: user.id,
+      expiresAt,
+    });
+
+    try {
+      // Send the password reset email
+      await this.emailService.sendPasswordResetEmail(user.email, token);
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      throw new BadRequestException(
+        'Failed to send password reset email. Please try again.',
+      );
+    }
+
+    return new ApiResponse({
+      message:
+        'If an account with that email exists, a password reset link has been sent.',
+      data: {},
+    });
+  }
+
+  /**
+   * Resets the user's password using a valid reset token.
+   *
+   * @param {string} token - The password reset token.
+   * @param {string} newPassword - The new password.
+   * @param {string} confirmPassword - The confirmation of the new password.
+   * @returns {Promise<ApiResponse>} - The response indicating the password was reset successfully.
+   * @throws {NotFoundException} - If the reset token is not found.
+   * @throws {UnauthorizedException} - If the reset token has expired.
+   * @throws {BadRequestException} - If the passwords don't match.
+   */
+  async resetPassword(
+    token: string,
+    newPassword: string,
+    confirmPassword: string,
+  ): Promise<ApiResponse<object>> {
+    // Validate that passwords match
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException('Passwords do not match.');
+    }
+
+    // Find the password reset token
+    const resetToken = await this.passwordResetTokenRepo.findOne({
+      where: { token },
+      relations: ['user'],
+    });
+
+    if (!resetToken) {
+      throw new NotFoundException('Invalid or expired password reset token.');
+    }
+
+    // Check if token has expired
+    if (resetToken.expiresAt < new Date()) {
+      throw new UnauthorizedException('Password reset token has expired.');
+    }
+
+    // Hash the new password
+    const passwordHash = await argon2.hash(newPassword);
+
+    // Update the user's password
+    await this.userRepo.update(resetToken.userId, {
+      password: passwordHash,
+    });
+
+    // Delete the used token
+    await this.passwordResetTokenRepo.delete(resetToken.id);
+
+    return new ApiResponse({
+      message: 'Password has been reset successfully.',
+      data: {},
     });
   }
 }

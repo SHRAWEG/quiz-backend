@@ -10,6 +10,8 @@ import { ApiQuery } from '@nestjs/swagger';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { LoginDto } from './dto/update-auth.dto';
 
 interface ResendVerificationDto {
@@ -66,5 +68,17 @@ export class AuthController {
     return {
       message: 'Verification email sent successfully',
     };
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+    return this.usersService.forgotPassword(email);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    const { token, newPassword, confirmPassword } = resetPasswordDto;
+    return this.usersService.resetPassword(token, newPassword, confirmPassword);
   }
 }

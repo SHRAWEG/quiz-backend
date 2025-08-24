@@ -7,6 +7,7 @@ import { Option } from './modules/options/entities/option.entity';
 import { Question } from './modules/questions/entities/question.entity';
 import { SubSubject } from './modules/sub-subjects/entities/sub-subject.entity';
 import { Subject } from './modules/subjects/entities/subject.entity';
+import { PasswordResetToken } from './modules/users/entities/password-reset-token.entity';
 import { User } from './modules/users/entities/user.entity';
 import { VerificationToken } from './modules/users/entities/verification-token.entity';
 // GUARDS
@@ -46,6 +47,7 @@ import { UsersModule } from './modules/users/users.module';
       SubSubject,
       User,
       VerificationToken,
+      PasswordResetToken,
       Category,
       QuestionSet,
     ]), // Importing Role and User entities

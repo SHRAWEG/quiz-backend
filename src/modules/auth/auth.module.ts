@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Category } from '../categories/entities/category.entity';
 import { EmailService } from '../email/email.service';
+import { PasswordResetToken } from '../users/entities/password-reset-token.entity';
 import { User } from '../users/entities/user.entity';
 import { VerificationToken } from '../users/entities/verification-token.entity';
 import { UsersModule } from '../users/users.module';
@@ -11,7 +12,12 @@ import { AuthService } from './auth.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Category, VerificationToken]),
+    TypeOrmModule.forFeature([
+      User,
+      Category,
+      VerificationToken,
+      PasswordResetToken,
+    ]),
     UsersModule,
   ],
   controllers: [AuthController],
