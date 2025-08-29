@@ -47,6 +47,9 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastLogin: Date;
 
+  @Column({ nullable: true })
+  profilePicture?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

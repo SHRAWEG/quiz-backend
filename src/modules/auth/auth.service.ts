@@ -7,7 +7,6 @@ import { JwtService } from '@nestjs/jwt';
 import { ApiResponse } from 'src/common/classes/api-response';
 import { JwtPayload } from 'src/common/interfaces/jwt-payload.interface';
 import { CreateUserDto } from '../users/dto/create-user.dto';
-import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/update-auth.dto';
 
@@ -78,6 +77,7 @@ export class AuthService {
         role: user.role,
         name: `${user.firstName} ${user.middleName ?? ''} ${user.lastName}`,
         hasPreference: user.preferredCategories.length > 0,
+        profilePicture: user.profilePicture,
       },
     });
   }
@@ -86,9 +86,9 @@ export class AuthService {
    * Retrieves the details of a user by their unique identifier.
    *
    * @param userId - The unique identifier of the user whose details are to be retrieved.
-   * @returns {Promise<ApiResponse<User>>} A promise that resolves to the user's details.
+   * @returns {Promise<ApiResponse<object>>} A promise that resolves to the user's details with profile picture URL.
    */
-  findUserDetails(userId: string): Promise<ApiResponse<User>> {
+  findUserDetails(userId: string): Promise<ApiResponse<object>> {
     return this.usersService.getUserDetails(userId);
   }
 }

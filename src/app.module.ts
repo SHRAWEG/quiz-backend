@@ -1,6 +1,7 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { TypeOrmModule } from '@nestjs/typeorm';
 // ENTITIES
 import { Option } from './modules/options/entities/option.entity';
@@ -40,6 +41,15 @@ import { UsersModule } from './modules/users/users.module';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    ServeStaticModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => [
+        {
+          rootPath: configService.get<string>('UPLOADS_BASE_PATH', './uploads'),
+          serveRoot: '/uploads',
+        },
+      ],
+    }),
     TypeOrmModule.forFeature([
       Option,
       Question,

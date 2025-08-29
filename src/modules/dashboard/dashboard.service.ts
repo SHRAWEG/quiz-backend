@@ -182,6 +182,7 @@ export class DashboardService {
       name: string;
       score: number;
       attempts: number;
+      profilepicture: string;
     };
 
     // 1. Get all users with at least one completed attempt and their stats
@@ -195,6 +196,7 @@ export class DashboardService {
       .leftJoin(QuestionAttempt, 'qa', 'qa.questionSetAttemptId = qsa.id')
       .select([
         'user.id AS id',
+        'user.profilePicture AS profilePicture',
         `CONCAT(user.firstName, ' ', user.lastName) AS name`,
         `COALESCE(
           ROUND(
@@ -209,6 +211,7 @@ export class DashboardService {
       .groupBy('user.id')
       .addGroupBy('user.firstName')
       .addGroupBy('user.lastName')
+      .addGroupBy('user.profilePicture')
       .having('COUNT(qsa.id) > 0')
       .getRawMany();
 
@@ -225,6 +228,7 @@ export class DashboardService {
       score: Number(u.score) || 0,
       attempts: Number(u.attempts) || 0,
       isCurrentUser: u.id === currentUserId,
+      profilePicture: u.profilepicture || null,
     }));
 
     // 3. Prepare leaderboard: top 10 + current user if not in top 10
