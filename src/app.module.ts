@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { TypeOrmModule } from '@nestjs/typeorm';
 // ENTITIES
+import { Notice } from './modules/notices/entities/notice.entity';
 import { Option } from './modules/options/entities/option.entity';
 import { Question } from './modules/questions/entities/question.entity';
 import { SubSubject } from './modules/sub-subjects/entities/sub-subject.entity';
@@ -25,6 +26,7 @@ import { CreditModule } from './modules/credit/credit.module';
 import { CronTaskModule } from './modules/cron-task/cron-task.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { FeedbacksModule } from './modules/feedbacks/feedbacks.module';
+import { NoticesModule } from './modules/notices/notices.module';
 import { OptionsModule } from './modules/options/options.module';
 import { QuestionAttemptModule } from './modules/question-attempt/question-attempt.module';
 import { QuestionSetAttemptModule } from './modules/question-set-attempt/question-set-attempt.module';
@@ -60,6 +62,7 @@ import { UsersModule } from './modules/users/users.module';
       PasswordResetToken,
       Category,
       QuestionSet,
+      Notice,
     ]), // Importing Role and User entities
     ConfigModule.forRoot({
       isGlobal: true,
@@ -93,6 +96,7 @@ import { UsersModule } from './modules/users/users.module';
     CreditModule,
     DashboardModule,
     FeedbacksModule,
+    NoticesModule,
   ],
   controllers: [],
   providers: [UsersService, EmailService],

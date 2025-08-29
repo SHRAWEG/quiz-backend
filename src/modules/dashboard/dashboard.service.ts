@@ -3,7 +3,8 @@ import { REQUEST } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { Role } from 'src/common/enums/roles.enum';
-import { Repository } from 'typeorm';
+import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import { Notice } from '../notices/entities/notice.entity';
 import { QuestionAttempt } from '../question-attempt/entities/question-attempt.entity';
 import { QuestionSetAttempt } from '../question-set-attempt/entities/question-set-attempt.entity';
 import { Question } from '../questions/entities/question.entity';
@@ -20,6 +21,10 @@ export class DashboardService {
 
     @InjectRepository(QuestionSetAttempt)
     private readonly questionSetAttemptRepo: Repository<QuestionSetAttempt>,
+
+    @InjectRepository(Notice)
+    private readonly noticeRepo: Repository<Notice>,
+
     @Inject(REQUEST) private readonly request: Request,
   ) {}
 
@@ -125,6 +130,21 @@ export class DashboardService {
 
     const totalTimeInSeconds = parseFloat(totalTimeResult?.totalTime || '0');
 
+    // Get active notices
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const activeNotices = await this.noticeRepo.find({
+      where: {
+        isActive: true,
+        fromDate: LessThanOrEqual(today),
+        toDate: MoreThanOrEqual(today),
+      },
+      relations: ['createdBy'],
+      order: { createdAt: 'DESC' },
+      take: 5, // Limit to 5 most recent notices
+    });
+
     return {
       success: true,
       data: {
@@ -132,6 +152,7 @@ export class DashboardService {
         completedQuestionSets: completedCount,
         incompleteQuestionSets: incompleteCount,
         timeSpentInSeconds: totalTimeInSeconds,
+        activeNotices,
       },
     };
   }
@@ -161,12 +182,28 @@ export class DashboardService {
       .andWhere('question.status = :status', { status: 'approved' })
       .getCount();
 
+    // Get active notices
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const activeNotices = await this.noticeRepo.find({
+      where: {
+        isActive: true,
+        fromDate: LessThanOrEqual(today),
+        toDate: MoreThanOrEqual(today),
+      },
+      relations: ['createdBy'],
+      order: { createdAt: 'DESC' },
+      take: 5, // Limit to 5 most recent notices
+    });
+
     return {
       success: 'true',
       data: {
         totalQuestionsAuthored: totalAuthored,
         totalUsedInQuestionSets: usedInQuestionSets,
         totalApprovedQuestions: approvedQuestions,
+        activeNotices,
       },
     };
   }
