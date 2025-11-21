@@ -21,7 +21,7 @@ export class TimeExpiryProcessor implements OnModuleInit {
       'question-set-timeout',
       async (job: Job<{ sessionId: string }>) => {
         const { sessionId } = job.data;
-        console.log(`Time expired for session: ${sessionId}`);
+
         try {
           const questionSetAttempt = await this.questionSetAttemptsRepository
             .createQueryBuilder('questionSetAttempt')

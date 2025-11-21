@@ -248,9 +248,9 @@ export class UsersService {
         message: 'User updated successfully.',
         data: safeUser,
       });
-    } catch (err) {
+    } catch {
       await queryRunner.rollbackTransaction();
-      console.log(err);
+
       throw new BadRequestException('User update failed');
     } finally {
       await queryRunner.release();
@@ -724,7 +724,6 @@ export class UsersService {
         UPLOAD_DIRECTORIES.PROFILE_PICTURES,
       );
 
-      console.log(uploadsDir);
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
@@ -842,7 +841,7 @@ export class UsersService {
       });
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      console.log(err);
+
       if (err instanceof ValidationException) {
         throw err;
       }

@@ -27,6 +27,8 @@ import { CronTaskModule } from './modules/cron-task/cron-task.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { FeedbacksModule } from './modules/feedbacks/feedbacks.module';
 import { NoticesModule } from './modules/notices/notices.module';
+import { OAuthModule } from './modules/oauth/oauth.module';
+import { OAuthService } from './modules/oauth/oauth.service';
 import { OptionsModule } from './modules/options/options.module';
 import { QuestionAttemptModule } from './modules/question-attempt/question-attempt.module';
 import { QuestionSetAttemptModule } from './modules/question-set-attempt/question-set-attempt.module';
@@ -63,7 +65,7 @@ import { UsersModule } from './modules/users/users.module';
       Category,
       QuestionSet,
       Notice,
-    ]), // Importing Role and User entities
+    ]), // Importing entities
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -79,6 +81,7 @@ import { UsersModule } from './modules/users/users.module';
     DatabaseModule,
     //
     AuthModule,
+    OAuthModule,
     //
     OptionsModule,
     QuestionsModule,
@@ -103,11 +106,30 @@ import { UsersModule } from './modules/users/users.module';
   exports: [UsersService, EmailService],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly oauthService: OAuthService,
+  ) {}
 
   async onModuleInit() {
     await this.usersService.seedAdmin();
     await this.usersService.seedTeacher();
     await this.usersService.seedStudent();
+
+    // Seed OAuth IDs for existing users
+    // Use setTimeout to ensure database is fully initialized
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await this.oauthService.seedOAuthIdsForExistingUsers();
+          console.log(
+            `OAuth IDs seeded: ${result.created} created, ${result.existing} existing, ${result.total} total users`,
+          );
+        } catch (error) {
+          console.error('Error seeding OAuth IDs:', error);
+          // Don't throw - this is non-critical
+        }
+      })();
+    }, 1000);
   }
 }

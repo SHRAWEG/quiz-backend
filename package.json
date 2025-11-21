@@ -15,6 +15,7 @@
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "seed:admin": "ts-node src/database/seeds/create-admin-user.seed.ts",
+    "seed:oauth-ids": "ts-node -r tsconfig-paths/register src/database/seeds/seed-oauth-ids.seed.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

@@ -130,7 +130,6 @@ export class QuestionSetsController {
   @Get('/question-sets-to-attempt/:id')
   @Roles(Role.STUDENT)
   getQuestionSetToAttempt(@Param('id') id: string) {
-    console.log('running /question-sets-to-attempt/:id ');
     return this.questionSetService.getQuestionSetToAttempt(id);
   }
 

@@ -14,13 +14,12 @@ export class CronTaskService {
   @Cron(CronExpression.EVERY_MINUTE)
   @Cron('*/10 * * * * *')
   async handleExpiredQuizEvery30s() {
-    console.log('⏰ Cron is running');
     await this.handleExpiredQuizzes();
   }
 
   async completeQuiz(questionSetAttemptId: string, queryRunner?: QueryRunner) {
     const manager = queryRunner?.manager || this.dataSource.manager;
-    console.log('questiojnSetAttemtId : ', questionSetAttemptId);
+
     const questionSetAttempt = await manager
       .getRepository(QuestionSetAttempt)
       .createQueryBuilder('questionSetAttempt')
@@ -62,7 +61,7 @@ export class CronTaskService {
 
   async handleExpiredQuizzes() {
     const now = new Date();
-    console.log('⏰ Running cron job at:', now.toISOString());
+
     const expiredAttempts = await this.dataSource.manager
       .getRepository(QuestionSetAttempt)
       .createQueryBuilder('questionSetAttempt')
@@ -73,10 +72,8 @@ export class CronTaskService {
       .getMany();
 
     for (const attempt of expiredAttempts) {
-      console.log(attempt.id);
       try {
         await this.completeQuiz(attempt.id);
-        console.log(`Auto-completed expired quiz: ${attempt.id}`);
       } catch (error) {
         console.error(`Failed to auto-complete quiz ${attempt.id}:`, error);
       }
