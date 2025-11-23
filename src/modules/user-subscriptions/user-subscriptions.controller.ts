@@ -22,13 +22,11 @@ export class UserSubscriptionsController {
 
   @Post('/checkout/:subscriptionPlanId')
   async checkout(@Param('subscriptionPlanId') subscriptionPlanId: string) {
-    console.log('Subscription Plan ID:', subscriptionPlanId);
     return await this.userSubscriptionsService.checkout(subscriptionPlanId);
   }
 
   @Post('/updatePayment/:data')
   async updatePayment(@Param('data') data: string) {
-    console.log('Subscription Plan ID:', data);
     return await this.userSubscriptionsService.updatePaymentStatus(data);
   }
 }

@@ -10,8 +10,6 @@ export function ForbidIfNotType(
   validationOptions?: ValidationOptions,
 ) {
   return function (object: Record<string, any>, propertyName: string) {
-    console.log(object);
-    console.log(propertyName);
     registerDecorator({
       name: 'forbidIfNotType',
       target: object.constructor,
