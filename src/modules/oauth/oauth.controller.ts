@@ -326,7 +326,7 @@ export class OAuthController {
       console.error('OAuth authorize-with-token error:', error);
       return res.status(401).json({
         error: 'unauthorized',
-        error_description: 'Invalid or expired token',
+        error_description: 'Invalid or expired oauth token',
       });
     }
   }
