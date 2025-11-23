@@ -10,7 +10,6 @@ import {
   IsNotEmpty,
   IsString,
   IsUUID,
-  MaxLength,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
@@ -26,7 +25,7 @@ export class CreateQuestionDto {
   })
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
+  // @MaxLength(500)
   @IsUnique('questions', 'questionText', {
     message: 'This question already exists',
   })

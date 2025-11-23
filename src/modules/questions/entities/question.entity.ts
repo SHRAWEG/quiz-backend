@@ -27,7 +27,7 @@ export class Question {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 500 })
+  @Column({ type: 'varchar' })
   questionText: string;
 
   @Column({ type: 'enum', enum: QuestionType })
